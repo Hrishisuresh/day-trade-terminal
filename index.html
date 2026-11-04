@@ -1,0 +1,2143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="DT Terminal">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Day-Trade Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000; --panel: #080808; --head: #141414; --line: #252525;
+    --amber: #ffa028; --amber-hi: #ffbe5c; --white: #ebebeb; --muted: #8e8e8e; --dim: #5a5a5a;
+    --up: #3ddc84; --down: #ff5252; --blue: #5ab0ff;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--white); font-family: var(--mono); font-size: 13px; }
+  a { color: var(--blue); }
+  button, input, select { font-family: var(--mono); }
+
+  /* ---------- status strip ---------- */
+  .top { position: sticky; top: 0; z-index: 20; background: #0a0a0a; border-bottom: 1px solid var(--line); }
+  .top1 { display: flex; align-items: center; gap: 10px; padding: 7px 10px 3px; }
+  .logo { background: var(--amber); color: #000; font-weight: 700; padding: 1px 6px; letter-spacing: .06em; }
+  .ist { color: var(--amber-hi); font-weight: 700; font-size: 15px; }
+  .ist small { color: var(--amber); font-weight: 500; font-size: 11px; margin-left: 3px; }
+  .spacer { flex: 1; }
+  .badge { font-weight: 700; padding: 1px 8px; border: 1px solid currentColor; white-space: nowrap; font-size: 12px; }
+  .badge.open { color: var(--up); } .badge.closed { color: var(--down); }
+  .top2 { padding: 0 10px 7px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+  .top2 b { color: var(--white); font-weight: 600; }
+  .top2 .live { color: var(--up); font-weight: 700; }
+
+  /* ---------- layout ---------- */
+  .wrap { display: grid; gap: 8px; padding: 8px; grid-template-columns: minmax(0, 1fr); }
+  .sec { background: var(--panel); border: 1px solid var(--line); min-width: 0; }
+  .shead { display: flex; align-items: center; gap: 8px; min-height: 30px; padding-left: 9px; background: var(--head); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .shead h2 { margin: 0; font-size: 12.5px; color: var(--amber); letter-spacing: .06em; text-transform: uppercase; font-weight: 600; white-space: nowrap; }
+  .shead .hint { color: var(--dim); font-size: 11px; }
+  .tabs { display: flex; flex-wrap: wrap; margin-left: auto; }
+  .tab { background: transparent; color: var(--muted); border: 0; border-left: 1px solid var(--line); padding: 7px 9px; cursor: pointer; font-size: 11.5px; font-weight: 600; }
+  .tab.on { background: var(--amber-hi); color: #000; }
+  .sbody { position: relative; }
+  .wslot { position: absolute; inset: 0; }
+  .wslot .tradingview-widget-container { height: 100%; width: 100%; display: flex; flex-direction: column; }
+  .wslot .tradingview-widget-container__widget { flex: 1; min-height: 0; }
+  .tradingview-widget-copyright { font-size: 9.5px; line-height: 14px; text-align: right; padding: 0 6px; }
+  .tradingview-widget-copyright a { color: #44607f; text-decoration: none; }
+  .wfail { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+  .wfail b { color: var(--amber); }
+  .note { color: var(--muted); font-size: 11.5px; line-height: 1.55; padding: 8px 10px; }
+  .note b { color: var(--white); }
+
+  /* ---------- day-trade tiles ---------- */
+  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); }
+  .tile { background: var(--panel); display: flex; flex-direction: column; min-width: 0; }
+  .tile.sel { box-shadow: inset 0 0 0 2px var(--amber); }
+  .thead { display: flex; align-items: center; gap: 6px; width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--line); color: var(--white); padding: 6px 8px; cursor: pointer; text-align: left; }
+  .thead .tn { font-weight: 700; font-size: 13px; }
+  .thead .tc { margin-left: auto; color: var(--amber); font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .tile.sel .thead { background: #1d1607; }
+  .tile.sel .thead .tc { color: var(--amber-hi); }
+  .tmov { color: var(--dim); font-size: 10.5px; padding: 3px 8px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tbody { position: relative; height: 150px; }
+
+  /* ---------- mood ---------- */
+  .mood { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; background: var(--line); }
+  .mitem { background: var(--panel); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); min-height: 118px; }
+  .mtext { padding: 8px 10px; font-size: 11.5px; line-height: 1.5; color: var(--muted); }
+  .mtext b { display: block; color: var(--amber-hi); font-size: 12.5px; margin-bottom: 2px; }
+  .mtext .up { color: var(--up); } .mtext .dn { color: var(--down); }
+  .mw { position: relative; min-height: 118px; }
+
+  /* ---------- chart + side ---------- */
+  .chartbody { height: 460px; }
+  .s-chart { display: flex; flex-direction: column; }
+  .s-chart .chartbody { flex: 1 0 auto; }
+  .tabody { height: 340px; }
+  .timing { padding: 6px 10px 10px; }
+  .timing h4 { margin: 8px 0 3px; font-size: 11px; color: var(--amber); letter-spacing: .07em; font-weight: 600; text-transform: uppercase; display: flex; justify-content: space-between; }
+  .timing h4 span { color: var(--dim); text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; padding: 4px 4px; border-bottom: 1px dotted #1c1c1c; align-items: center; }
+  .row .nm { white-space: nowrap; }
+  .row .st { font-size: 11px; font-weight: 700; color: var(--dim); white-space: nowrap; }
+  .row .hrs { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+  .row.live { background: rgba(61, 220, 132, .07); }
+  .row.live .nm, .row.live .st { color: var(--up); }
+
+  .newsbody, .calbody { height: 520px; }
+
+  /* ---------- news impact guide ---------- */
+  .howto { padding: 8px 10px 4px; display: grid; gap: 6px; grid-template-columns: minmax(0, 1fr); }
+  .howto div { font-size: 12px; line-height: 1.5; color: var(--muted); padding-left: 16px; position: relative; }
+  .howto div::before { content: "›"; position: absolute; left: 3px; color: var(--amber); font-weight: 700; }
+  .howto b { color: var(--white); }
+  .upnext { margin: 8px 10px; border: 1px solid #2a2111; background: #0d0a04; }
+  .upnext h3 { margin: 0; padding: 6px 8px; font-size: 11px; color: var(--amber); letter-spacing: .07em; border-bottom: 1px solid #2a2111; }
+  .un { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 8px; padding: 6px 8px; border-bottom: 1px dotted #2a2111; font-size: 12px; }
+  .un:last-child { border-bottom: 0; }
+  .un .w { color: var(--white); } .un .w b { color: var(--amber-hi); }
+  .un .c { color: var(--muted); white-space: nowrap; text-align: right; font-weight: 600; }
+  .un .k { grid-column: 1 / -1; color: var(--dim); font-size: 11px; }
+  .un.soon .c { color: var(--amber-hi); }
+  .un.live { background: rgba(61, 220, 132, .08); } .un.live .c { color: var(--up); }
+  .evgroup { margin: 10px 10px 2px; font-size: 11px; color: var(--amber); letter-spacing: .07em; font-weight: 600; text-transform: uppercase; }
+  details.ev { border-top: 1px solid var(--line); }
+  details.ev:last-of-type { border-bottom: 1px solid var(--line); }
+  details.ev > summary { list-style: none; cursor: pointer; padding: 8px 10px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; }
+  details.ev > summary::-webkit-details-marker { display: none; }
+  details.ev > summary .n { color: var(--white); font-weight: 600; }
+  details.ev > summary .n::before { content: "▸ "; color: var(--amber); }
+  details.ev[open] > summary .n::before { content: "▾ "; }
+  details.ev > summary .imp { font-size: 10px; font-weight: 700; padding: 1px 6px; align-self: center; white-space: nowrap; }
+  .imp.hi { background: var(--down); color: #000; } .imp.md { background: var(--amber); color: #000; } .imp.un2 { background: #333; color: var(--white); }
+  details.ev > summary .when { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; }
+  details.ev > summary .when b { color: var(--amber-hi); font-weight: 600; }
+  .evbody { padding: 2px 10px 12px; }
+  .evbody .what { color: var(--muted); font-size: 12px; line-height: 1.5; margin-bottom: 8px; }
+  .sc { border: 1px solid #1f1f1f; margin-bottom: 6px; }
+  .sc .lab { padding: 5px 8px; font-size: 12px; font-weight: 700; background: #101010; }
+  .sc .lab.hi { color: var(--down); } .sc .lab.eq { color: var(--muted); } .sc .lab.lo { color: var(--up); }
+  .chips { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; background: #1a1a1a; }
+  .chip { background: var(--panel); text-align: center; padding: 4px 2px 5px; }
+  .chip i { display: block; font-style: normal; font-size: 9.5px; color: var(--dim); letter-spacing: .03em; }
+  .chip span { font-size: 14px; font-weight: 700; }
+  .chip .U, .chip .u { color: var(--up); } .chip .us { color: #2a8f57; }
+  .chip .D, .chip .d { color: var(--down); } .chip .ds { color: #a33a3a; }
+  .chip .m { color: var(--muted); font-size: 12px; } .chip .x { color: var(--amber); font-size: 10.5px; } .chip .n0 { color: #3a3a3a; }
+  .sc .why { padding: 5px 8px 6px; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+  .watch { font-size: 11.5px; color: var(--muted); line-height: 1.5; border-left: 2px solid var(--amber); padding: 2px 0 2px 8px; margin-top: 8px; }
+  .watch b { color: var(--amber-hi); }
+  .legend { padding: 6px 10px; font-size: 11px; color: var(--dim); line-height: 1.6; display: flex; flex-wrap: wrap; gap: 2px 12px; }
+  .legend span { white-space: nowrap; }
+
+  /* ---------- volume ---------- */
+  .vrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 10px; border-top: 1px solid var(--line); align-items: center; }
+  .vrow .vm { font-weight: 700; color: var(--white); }
+  .vrow .vs { grid-column: 1; color: var(--muted); font-size: 11.5px; }
+  .vrow .vl { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+  .vbtn { display: inline-block; text-decoration: none; font-size: 11px; font-weight: 700; padding: 4px 8px; border: 1px solid var(--amber); color: var(--amber-hi); white-space: nowrap; }
+  .vbtn.alt { border-color: #335; color: var(--blue); }
+  .vnotes { padding: 4px 10px 12px; display: grid; gap: 8px; border-top: 1px solid var(--line); }
+  .vnotes div { font-size: 12px; line-height: 1.55; color: var(--muted); }
+  .vnotes b { color: var(--white); }
+  .volbody { height: 400px; }
+  /* order flow */
+  .flowbar { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 6px 9px; border-bottom: 1px solid var(--line); }
+  .fstat { color: var(--muted); font-size: 11.5px; }
+  .fstat b { color: var(--white); }
+  .fstat .ok { color: var(--up); } .fstat .bad { color: var(--down); } .fstat .wait { color: var(--amber); }
+  .flbl { color: var(--dim); font-size: 11px; }
+  .tabs.mini { margin-left: 0; border: 1px solid var(--line); }
+  .tabs.mini .tab { padding: 4px 7px; font-size: 11px; border-left: 0; border-right: 1px solid var(--line); }
+  .tabs.mini .tab:last-child { border-right: 0; }
+  .flowgrid { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .fpwrap, .vpwrap { position: relative; min-width: 0; }
+  .fpwrap canvas, .vpwrap canvas { display: block; width: 100%; }
+  .vpwrap { border-top: 1px solid var(--line); }
+  .flowmsg { position: absolute; left: 0; right: 0; top: 0; height: 420px; display: none; align-items: center; justify-content: center; text-align: center; padding: 20px; color: var(--muted); font-size: 12.5px; line-height: 1.6; background: rgba(0,0,0,.6); }
+  .flowmsg.on { display: flex; }
+  .flowmsg b { color: var(--amber-hi); }
+  .levels { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 10px; padding: 8px 10px; font-size: 12px; border-top: 1px solid var(--line); }
+  .levels .lk { color: var(--amber); font-weight: 700; } .levels .lv { color: var(--white); } .levels .lc { color: var(--amber-hi); text-align: right; }
+  .conv { display: flex; gap: 6px; align-items: center; padding: 6px 10px 10px; flex-wrap: wrap; }
+  .conv label { color: var(--muted); font-size: 11.5px; }
+  .conv input { flex: 1; min-width: 90px; background: #000; color: var(--amber-hi); border: 1px solid #333; padding: 5px 7px; font-size: 12.5px; }
+  .conv button, .kbtns button { background: var(--amber); color: #000; border: 0; font-weight: 700; padding: 6px 10px; cursor: pointer; font-size: 12px; }
+  .kbtns button.ghost { background: transparent; color: var(--muted); border: 1px solid #333; }
+  details.keys { border-top: 1px solid var(--line); }
+  details.keys > summary { cursor: pointer; padding: 8px 10px; color: var(--amber); font-size: 12px; font-weight: 600; }
+  .kbody { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 8px; }
+  .kbody ol { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+  .kbody ol b { color: var(--white); }
+  .kbody .note { padding: 0; }
+  .kbtns { display: flex; gap: 8px; }
+  /* news values */
+  .relbox { margin: 8px 10px; border: 1px solid var(--line); }
+  .relbox h3 { margin: 0; padding: 6px 8px; font-size: 11px; color: var(--amber); letter-spacing: .07em; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .relbox h3 span { color: var(--dim); font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .relempty { padding: 10px 8px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+  .relday { padding: 6px 8px 3px; font-size: 10.5px; color: var(--amber); letter-spacing: .07em; font-weight: 700; border-bottom: 1px solid var(--line); background: #0d0d0d; }
+  .rel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px 8px; padding: 8px; border-bottom: 1px dotted #222; align-items: end; font-size: 12.5px; }
+  .rel .rn { grid-column: 1 / -1; color: var(--white); min-width: 0; line-height: 1.4; }
+  .rel .rn small { display: block; color: var(--muted); font-size: 11px; }
+  .rel .rn .cc { color: var(--amber); font-weight: 700; margin-right: 5px; }
+  .rel .rn .ih { color: var(--down); font-size: 10px; font-weight: 700; margin-left: 4px; }
+  .rel .rv { color: var(--white); font-variant-numeric: tabular-nums; min-width: 0; }
+  .rel .rv i { display: block; font-style: normal; font-size: 9.5px; color: var(--dim); letter-spacing: .05em; margin-bottom: 2px; }
+  .rel .rv.f { color: var(--amber-hi); font-weight: 700; } .rel .rv.p { color: var(--muted); }
+  .rel .rv input { width: 100%; box-sizing: border-box; background: #000; color: var(--up); border: 1px solid #444; padding: 4px 6px; font-size: 12.5px; font-weight: 700; }
+  .rel .rv.f input { color: var(--amber-hi); }
+  .rel .rv input::placeholder { color: #555; font-weight: 400; }
+  .rel .verdict { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); line-height: 1.55; }
+  .rel .verdict b { color: var(--white); }
+  .rel .verdict .vh { color: var(--down); font-weight: 700; } .rel .verdict .vl { color: var(--up); font-weight: 700; } .rel .verdict .ve { color: var(--white); font-weight: 700; }
+  .rel .verdict a { color: var(--blue); text-decoration: none; cursor: pointer; white-space: nowrap; }
+  .rel.live { background: rgba(255, 160, 40, .1); }
+  .rel.done { background: rgba(255, 255, 255, .025); }
+  .mch { display: inline-flex; gap: 2px 8px; flex-wrap: wrap; vertical-align: baseline; }
+  .mch i { font-style: normal; color: var(--dim); font-size: 10px; }
+  .mch span { font-weight: 700; }
+  .mch .U, .mch .u { color: var(--up); } .mch .us { color: #2a8f57; }
+  .mch .D, .mch .d { color: var(--down); } .mch .ds { color: #a33a3a; }
+  .mch .m { color: var(--muted); } .mch .x { color: var(--amber); } .mch .n0 { color: #3a3a3a; }
+  .evlive { margin: 0 0 10px; border: 1px solid #2a2111; }
+  .evlive:empty { display: none; }
+  .evf { color: var(--white); }
+  .evf .vh { color: var(--down); font-weight: 700; } .evf .vl { color: var(--up); font-weight: 700; }
+  .relnote { border-top: 1px solid var(--line); }
+  .relbox details.keys { border-top: 1px solid var(--line); }
+  .ktitle { color: var(--amber-hi); font-size: 12px; font-weight: 700; margin-top: 4px; }
+  .kbody pre { margin: 0; max-height: 170px; overflow: auto; background: #000; border: 1px solid #333; padding: 8px; font-size: 10.5px; line-height: 1.45; color: var(--amber-hi); white-space: pre; }
+  .kbody textarea { width: 100%; box-sizing: border-box; background: #000; color: var(--white); border: 1px solid #333; padding: 6px 7px; font: 11px var(--mono); resize: vertical; }
+  #ffMsg:empty { display: none; }
+  #ffMsg.ok { color: var(--up); } #ffMsg.bad { color: var(--down); }
+  #relSrc a { color: var(--blue); cursor: pointer; text-decoration: none; }
+  .levels .lh { color: var(--dim); font-size: 10.5px; }
+  @media (min-width: 700px) {
+    .rel { grid-template-columns: minmax(0, 1fr) repeat(3, 96px); }
+    .rel .rn { grid-column: auto; }
+  }
+  .sc.match { outline: 2px solid var(--amber); outline-offset: -1px; }
+  .sc.match .lab::after { content: "  ← LATEST RESULT"; color: var(--amber-hi); font-size: 10.5px; }
+  .evlive { margin-bottom: 8px; border: 1px solid #2a2111; }
+  .evlive .rel { grid-template-columns: minmax(0, 1fr) repeat(3, 70px); }
+  .volnone { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+  .volnone b { color: var(--amber-hi); }
+  .rvlink { color: var(--blue); font-size: 11px; text-decoration: none; padding: 0 9px; white-space: nowrap; font-weight: 600; }
+
+  /* ---------- collapsibles ---------- */
+  details.sec > summary { list-style: none; cursor: pointer; }
+  details.sec > summary::-webkit-details-marker { display: none; }
+  details.sec > summary .shead h2::before { content: "▸ "; }
+  details.sec[open] > summary .shead h2::before { content: "▾ "; }
+  .swingbody { height: 440px; }
+
+  /* ---------- risk tool ---------- */
+  .risk { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .fld { display: grid; grid-template-columns: 1fr 1.2fr; gap: 8px; align-items: center; }
+  .fld[hidden] { display: none; }
+  .fld label { color: var(--muted); font-size: 12px; }
+  .fld input, .fld select { width: 100%; background: #000; color: var(--amber-hi); border: 1px solid #333; padding: 6px 7px; font-size: 13px; outline: none; }
+  .fld input:focus, .fld select:focus { border-color: var(--amber); }
+  .pills { display: flex; gap: 4px; }
+  .pill { flex: 1; background: #111; color: var(--muted); border: 1px solid #333; padding: 5px 0; cursor: pointer; font-size: 12px; font-weight: 600; }
+  .pill.on { background: var(--amber); color: #000; border-color: var(--amber); }
+  .out { border-top: 1px solid var(--line); padding-top: 8px; display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; }
+  .out .k { color: var(--muted); font-size: 12px; } .out .v { text-align: right; font-weight: 600; }
+  .out .big { color: var(--amber-hi); font-size: 20px; } .out .good { color: var(--up); }
+  .warn { color: var(--down); font-size: 12px; }
+  .dstop { border-top: 1px solid var(--line); padding-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .dstop .lbl { color: var(--muted); font-size: 12px; flex: 1; }
+  .lbox { width: 34px; height: 26px; border: 1px solid #444; background: #000; color: var(--dim); cursor: pointer; font-weight: 700; }
+  .lbox.hit { background: var(--down); color: #000; border-color: var(--down); }
+  .stopmsg { width: 100%; font-weight: 700; font-size: 12px; color: var(--up); }
+  .stopmsg.one { color: var(--amber); }
+  .stopmsg.bad { color: #000; background: var(--down); padding: 4px 6px; }
+
+  footer { padding: 10px 12px 26px; color: var(--dim); font-size: 11px; line-height: 1.6; }
+
+  @media (min-width: 700px) {
+    .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .mood { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .mitem { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 120px; }
+    .chartbody { height: 540px; }
+  }
+  @media (min-width: 1100px) {
+    .wrap { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+    .s-tiles, .s-mood, .s-guide, .s-vol, .s-flow { grid-column: 1 / -1; }
+    .flowgrid { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); }
+    .vpwrap { border-top: 0; border-left: 1px solid var(--line); }
+    .howto { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .evcols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 1px; background: var(--line); }
+    .evcols > div { background: var(--panel); }
+    .vgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .vgrid .vrow { border-right: 1px solid var(--line); }
+    .tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .s-chart { grid-column: 1 / span 8; }
+    .s-side { grid-column: 9 / span 4; }
+    .s-news { grid-column: 1 / span 6; }
+    .s-cal { grid-column: 7 / span 6; }
+    .s-swing { grid-column: 1 / span 7; }
+    .s-tools { grid-column: 8 / span 5; }
+    .chartbody { height: 600px; }
+    .tabody { height: 300px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="top1">
+    <span class="logo">MKT</span>
+    <span class="ist" id="istClock">--:--<small>IST</small></span>
+    <span class="spacer"></span>
+    <span class="badge" id="fxBadge">FX —</span>
+  </div>
+  <div class="top2" id="nowLine">Loading…</div>
+</div>
+
+<main class="wrap">
+
+  <!-- 1. Day-trade markets -->
+  <section class="sec s-tiles" id="secTiles">
+    <div class="shead"><h2>My day-trade markets</h2><span class="hint">tap a name to open its chart</span></div>
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <!-- 2. Market mood -->
+  <section class="sec s-mood" id="secMood">
+    <div class="shead"><h2>Market mood</h2><span class="hint">fear · dollar · rates</span></div>
+    <div class="mood">
+      <div class="mitem">
+        <div class="mtext"><b>Fear gauge (VIX)</b>Rising = traders are nervous. Indices <span class="dn">usually fall</span>, gold <span class="up">often rises</span>. Above 20 = nervous, above 30 = high fear.</div>
+        <div class="mw"><div class="wslot" id="mVix"></div></div>
+      </div>
+      <div class="mitem">
+        <div class="mtext"><b>US dollar (DXY)</b>Rising dollar usually pushes <span class="dn">gold down</span>. Falling dollar usually helps gold.</div>
+        <div class="mw"><div class="wslot" id="mDxy"></div></div>
+      </div>
+      <div class="mitem">
+        <div class="mtext"><b>US 10-year yield</b>Rising yields usually weigh on <span class="dn">gold and NAS100</span>. Falling yields usually help both.</div>
+        <div class="mw"><div class="wslot" id="mYld"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Chart -->
+  <section class="sec s-chart" id="secChart">
+    <div class="shead"><h2 id="chartTitle">Chart</h2><a class="rvlink" id="rvLink" href="https://www.tradingview.com/" target="_blank" rel="noopener">Real volume ↗</a><div class="tabs" id="tfTabs"></div></div>
+    <div class="sbody chartbody"><div class="wslot" id="wChart"></div></div>
+  </section>
+
+  <!-- 4. Signals + timing -->
+  <section class="sec s-side" id="secSide">
+    <div class="shead"><h2 id="taTitle">Indicator signals</h2></div>
+    <div class="sbody tabody"><div class="wslot" id="wTa"></div></div>
+    <div class="note">This is what the usual chart indicators (moving averages, RSI and so on) say right now. It's a rough read of momentum, not a trade signal.</div>
+    <div class="shead"><h2>Timing</h2><span class="hint">IST</span></div>
+    <div class="timing" id="timing"></div>
+  </section>
+
+  <!-- 4b. Volume & big orders -->
+  <section class="sec s-vol" id="secVol">
+    <div class="shead"><h2 id="volTitle">Real volume bars</h2><div class="tabs" id="volTabs"></div></div>
+    <div class="sbody volbody"><div class="wslot" id="wVol"></div></div>
+    <div class="note" id="volNote"></div>
+    <div class="shead"><h2>Where the real volume &amp; orders are</h2><span class="hint">gold + your indices</span></div>
+    <div class="note">Your CFD charts (OANDA here, and most brokers) only show <b>tick volume</b>: how many times the price changed, not how much was actually traded. <b>Real volume and real order books live on the futures exchanges</b>, so for each of your markets, check its futures contract. On TradingView these are free with a short delay; live data is a paid add-on.</div>
+    <div class="vgrid" id="vTable"></div>
+    <div class="vnotes">
+      <div><b>Where the orders sit — gold:</b> OANDA's Order Book shows where OANDA traders have pending buy and sell orders and open positions, price level by price level. It covers the last 24 hours and updates every 30 minutes. It's one broker's clients, not the whole market, but it shows where stops and limit orders cluster.</div>
+      <div><b>Where the orders sit — indices:</b> the real order book (depth of market) for index futures needs paid live data through a futures broker. There's no free version. For the US ETFs above (SPY, QQQ, DIA, GLD), Cboe's free Book Viewer on cboe.com shows the top buy and sell orders and the last trades, but only for orders on Cboe's own exchanges (about a fifth of US share trading).</div>
+      <div><b>Free stand-in that works:</b> add a <b>Volume Profile</b> to the futures chart. The fattest bars show the prices where the most trading happened, and price often reacts there. TradingView's built-in version needs a paid plan; free community versions exist (Indicators → Community → search "Volume Profile"). Stops also cluster above old highs and below old lows: previous day high/low, Asian range, equal highs/lows.</div>
+      <div><b>What the big players hold:</b> the US regulator's Commitments of Traders report shows how large speculators are positioned in gold and index futures. Weekly — out <span id="cotTime">Friday 15:30 New York</span>, using Tuesday's data. <a class="rvlink" href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm" target="_blank" rel="noopener">CFTC COT ↗</a></div>
+    </div>
+  </section>
+
+  <!-- 4c. Order flow & volume profile -->
+  <section class="sec s-flow" id="secFlow">
+    <div class="shead"><h2 id="flowTitle">Order flow &amp; volume profile</h2><div class="tabs" id="flowSrc"></div></div>
+    <div class="flowbar">
+      <span class="fstat" id="flowStatus">Pick a market above.</span>
+      <span class="spacer"></span>
+      <span class="flbl">Candle</span><div class="tabs mini" id="flowTf"></div>
+      <span class="flbl">Range</span><div class="tabs mini" id="flowWin"></div>
+      <span class="flbl">Profile</span><div class="tabs mini" id="flowPr"></div>
+    </div>
+    <div class="flowgrid">
+      <div class="fpwrap"><canvas id="fpCanvas" aria-label="Order flow footprint chart"></canvas><div class="flowmsg" id="fpMsg"></div></div>
+      <div class="vpwrap"><canvas id="vpCanvas" aria-label="Volume profile"></canvas><div class="flowmsg" id="vpMsg"></div>
+        <div class="levels" id="vpLevels"></div>
+        <div class="conv"><label for="cfdNow">Your chart's price now</label><input id="cfdNow" type="number" inputmode="decimal" step="any" placeholder="e.g. 25010"><button type="button" id="cfdSet">Convert</button></div>
+      </div>
+    </div>
+    <details class="keys" id="flowKeys">
+      <summary>Data source setup — free Alpaca keys (one time)</summary>
+      <div class="kbody">
+        <ol>
+          <li>Go to <a href="https://app.alpaca.markets/signup" target="_blank" rel="noopener">app.alpaca.markets/signup</a> and create a free account (choose India as country — no money or ID needed for a paper account).</li>
+          <li>Stay on <b>Paper Trading</b>. On the home page, find <b>API Keys</b> on the right side and click <b>Generate</b>.</li>
+          <li>Paste the Key ID and Secret below and press Connect. They're saved only in this browser on this device.</li>
+        </ol>
+        <div class="fld"><label for="apKey">Key ID</label><input id="apKey" type="text" autocomplete="off" spellcheck="false"></div>
+        <div class="fld"><label for="apSec">Secret</label><input id="apSec" type="password" autocomplete="off"></div>
+        <div class="fld"><label>Data feed</label><div class="tabs mini" id="apFeed"></div></div>
+        <div class="kbtns"><button type="button" id="apSave">Connect</button><button type="button" id="apClear" class="ghost">Forget keys</button></div>
+        <div class="note">Only use <b>paper</b> keys — they can't move real money. The free plan gives the full US market 15 minutes late, or live data from one exchange (IEX, about 2–3% of trades).</div>
+      </div>
+    </details>
+    <div class="note"><b>How to read it.</b> Each footprint cell shows <span style="color:var(--down)">sellers</span> × <span style="color:var(--up)">buyers</span> at that price inside that candle. <b style="color:var(--up)">Green box</b> = buyers 3× sellers, <b style="color:var(--down)">red box</b> = sellers 3× buyers, <b style="color:var(--amber)">amber box</b> = the candle's most traded price. Δ (delta) = buyers − sellers: price rising on negative delta is a warning sign. The profile shows where most volume traded: <b>POC</b> = most traded price, <b>VAH/VAL</b> = edges of the zone holding 70% of volume — they often act as support and resistance. For the US funds, buyer/seller is estimated from price ticks (the free data doesn't say who hit whom); Binance gold shows the real side.</div>
+  </section>
+
+  <!-- 5. Headlines -->
+  <section class="sec s-news" id="secNews">
+    <div class="shead"><h2>Live headlines</h2><div class="tabs" id="newsTabs"></div></div>
+    <div class="sbody newsbody"><div class="wslot" id="wNews"></div></div>
+    <div class="note">Headlines update by themselves while this page is open. <b>It can't alert your phone when it's closed</b> — for instant pings, turn on breaking-news and economic-event alerts in the free Investing.com app.</div>
+  </section>
+
+  <!-- 6. Calendar -->
+  <section class="sec s-cal" id="secCal">
+    <div class="shead"><h2>Economic calendar</h2><div class="tabs" id="calTabs"></div></div>
+    <div class="sbody calbody"><div class="wslot" id="wCal"></div></div>
+    <div class="note"><b>Day-trade view</b> shows only high-impact events from the US, UK, Eurozone and Germany — the ones that move your six markets. <b>+ Swing</b> adds medium-impact events and Japan, Australia, Canada, Switzerland, New Zealand and China. See the guide below for which way things usually move.</div>
+  </section>
+
+  <!-- 7. News impact guide -->
+  <section class="sec s-guide" id="secGuide">
+    <div class="shead"><h2>News impact guide</h2><span class="hint">usual first reaction — not a rule</span></div>
+    <div class="howto">
+      <div><b>The forecast is already in the price.</b> Before each release, economists publish a forecast (the calendar shows it next to "Previous"). Traders position for it in advance.</div>
+      <div><b>Price moves on the surprise</b> — actual minus forecast. Small surprise = small, quick move. Big surprise = big move that can run for hours.</div>
+      <div><b>When it hits:</b> most of the move comes in the <b>first 1–15 minutes</b> after the release time. Spreads widen, and the first spike often fakes out (a stop hunt) before the real direction shows.</div>
+      <div><b>If it matches the forecast</b>, expect a quick spike both ways, then price usually goes back to what it was doing before.</div>
+    </div>
+    <div class="relbox">
+      <h3>THIS WEEK'S BIG RELEASES <span id="relSrc"></span></h3>
+      <div id="relTable"><div class="relempty">Loading forecasts…</div></div>
+      <details class="keys" id="ffKeys">
+        <summary>Load Forex Factory forecasts automatically (one-time fix)</summary>
+        <div class="kbody">
+          <div class="note">Forex Factory's feed doesn't let web pages read it directly — Chrome blocks it. A tiny free relay in your own Google account fixes that for good. Or paste the feed in by hand once a week.</div>
+          <div class="ktitle">Option A — automatic (about 5 minutes, once; easiest on a computer)</div>
+          <ol>
+            <li>Open <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener">script.google.com</a> signed in with your Google account. A new project opens.</li>
+            <li>Delete everything in the code box, then press <b>Copy code</b> below and paste it in. Press the save icon.</li>
+            <li>Top right: <b>Deploy → New deployment</b>. Click the gear next to "Select type" → <b>Web app</b>. Set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>. Press <b>Deploy</b>.</li>
+            <li>Press <b>Authorize access</b> and pick your account. Google warns "hasn't verified this app" because it's your own new script: click <b>Advanced → Go to Untitled project (unsafe)</b> → <b>Allow</b>.</li>
+            <li>Copy the <b>Web app URL</b> (ends in /exec), paste it below and press <b>Save &amp; load</b>.</li>
+          </ol>
+          <pre id="gasCode">function doGet(e) {
+  var cache = CacheService.getScriptCache();
+  var body = cache.get('ff');
+  if (!body) {
+    try {
+      var r = UrlFetchApp.fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', { muteHttpExceptions: true });
+      var t = r.getContentText();
+      if (r.getResponseCode() === 200 &amp;&amp; t.trim().charAt(0) === '[') {
+        body = t;
+        cache.put('ff', t, 1800);      // fresh copy, 30 minutes
+        cache.put('ffgood', t, 21600); // backup copy, 6 hours
+      }
+    } catch (err) {}
+    if (!body) body = cache.get('ffgood') || '[]';
+  }
+  var cb = e &amp;&amp; e.parameter &amp;&amp; e.parameter.callback;
+  if (cb &amp;&amp; /^[A-Za-z_$][\w$]*$/.test(cb)) {
+    return ContentService.createTextOutput(cb + '(' + body + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(body)
+    .setMimeType(ContentService.MimeType.JSON);
+}</pre>
+          <div class="kbtns"><button type="button" id="gasCopy">Copy code</button></div>
+          <div class="fld"><label for="ffRelay">Web app URL</label><input id="ffRelay" type="url" autocomplete="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></div>
+          <div class="kbtns"><button type="button" id="ffRelaySave">Save &amp; load</button><button type="button" id="ffRelayClear" class="ghost">Remove</button></div>
+          <div class="ktitle">Option B — quick paste (about once a week)</div>
+          <ol>
+            <li>Open <a href="https://nfs.faireconomy.media/ff_calendar_thisweek.json" target="_blank" rel="noopener">Forex Factory's weekly feed</a> — a page of plain text opens.</li>
+            <li>Select all (Ctrl+A, or long-press → Select all on a phone) and copy.</li>
+            <li>Paste it here and press <b>Load</b>.</li>
+          </ol>
+          <textarea id="ffPaste" rows="3" spellcheck="false" placeholder="Paste the Forex Factory feed here"></textarea>
+          <div class="kbtns"><button type="button" id="ffPasteLoad">Load</button></div>
+          <div class="note" id="ffMsg"></div>
+        </div>
+      </details>
+      <div class="note relnote"><b>Forecast</b> and <b>previous</b> come from Forex Factory's weekly calendar feed (checked once an hour). <b>Actual:</b> the second a number comes out it appears in the calendar panel above — type it into the ACTUAL box and the verdict and usual market reaction show straight away. Forex Factory's free feed has no actuals; FMP's calendar has them, but only on its $59/month Premium plan.</div>
+    </div>
+    <div class="upnext"><h3>NEXT BIG SCHEDULED NEWS</h3><div id="upNext"></div></div>
+    <div class="legend"><span><b style="color:var(--up)">▲▲</b>/<b style="color:var(--down)">▼▼</b> strong</span><span><b style="color:var(--up)">▲</b>/<b style="color:var(--down)">▼</b> usual</span><span><b style="color:#2a8f57">▲</b>/<b style="color:#a33a3a">▼</b> small</span><span><b style="color:var(--muted)">↕</b> quick spike, little change</span><span><b style="color:var(--amber)">mixed</b> depends on mood</span><span><b style="color:#3a3a3a">—</b> little effect</span></div>
+    <div id="evCards"></div>
+    <div class="note">Release times and dates come from the official publishers: BLS, the Federal Reserve, the ECB, the Bank of England and the ONS. Dates can change, so the live calendar above is the final word. Tap any event to see what each result usually does.</div>
+  </section>
+
+  <!-- 8. Swing list -->
+  <details class="sec s-swing" id="secSwing">
+    <summary><div class="shead"><h2>Swing watchlist</h2><span class="hint">tap to open</span></div></summary>
+    <div class="sbody swingbody"><div class="wslot" id="wSwing"></div></div>
+  </details>
+
+  <!-- 9. Tools -->
+  <details class="sec s-tools" id="secTools">
+    <summary><div class="shead"><h2>Position size &amp; daily stop</h2><span class="hint">tap to open</span></div></summary>
+    <div class="risk">
+      <div class="fld"><label for="rBal">Account (USD)</label><input id="rBal" type="number" inputmode="decimal" min="0" step="any" value="10000"></div>
+      <div class="fld"><label>Risk per trade</label>
+        <div class="pills" id="rPills">
+          <button type="button" class="pill" data-r="0.5">0.5%</button>
+          <button type="button" class="pill" data-r="1">1%</button>
+          <input id="rPct" type="number" inputmode="decimal" min="0" step="0.05" value="1" style="flex:1.1" aria-label="Risk percent">
+        </div>
+      </div>
+      <div class="fld"><label for="rInst">Market</label>
+        <select id="rInst">
+          <option value="index">Index (NAS100, US30, S&amp;P, GER40, UK100)</option>
+          <option value="gold">Gold (XAUUSD)</option>
+          <option value="xxxusd">EURUSD · GBPUSD · AUDUSD · NZDUSD</option>
+          <option value="usdjpy">USDJPY / JPY crosses</option>
+          <option value="usdxxx">USDCAD · USDCHF</option>
+        </select>
+      </div>
+      <div class="fld" id="rPtRow"><label for="rPt">$ per 1 point, 1 lot<br><small style="color:var(--dim)">from your broker</small></label><input id="rPt" type="number" inputmode="decimal" min="0" step="any" value="1"></div>
+      <div class="fld"><label for="rStop" id="rStopLbl">Stop loss (points)</label><input id="rStop" type="number" inputmode="decimal" min="0" step="any" value="20"></div>
+      <div class="fld" id="rRateRow" hidden><label for="rRate" id="rRateLbl">USDJPY rate</label><input id="rRate" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 150.00"></div>
+      <div class="out">
+        <span class="k">Money at risk</span><span class="v" id="oRisk">—</span>
+        <span class="k">Position size</span><span class="v big" id="oLots">—</span>
+        <span class="k">Target 1:2</span><span class="v good" id="oR2">—</span>
+        <span class="k">Target 1:3</span><span class="v good" id="oR3">—</span>
+      </div>
+      <div class="warn" id="rWarn"></div>
+      <div class="dstop">
+        <span class="lbl">Losses today (2 = stop)</span>
+        <button type="button" class="lbox" data-l="1">L1</button>
+        <button type="button" class="lbox" data-l="2">L2</button>
+        <div class="stopmsg" id="stopMsg">Clear to trade</div>
+      </div>
+    </div>
+  </details>
+</main>
+
+<footer>
+  Live data from TradingView widgets: gold, index CFDs (OANDA), forex, VIX and dollar index (Capital.com) stream in real time.
+  GER40 shows as OANDA "Germany 30", which tracks the 40-stock DAX. The guide shows usual first reactions, not guarantees.
+  Order flow: Binance futures trade stream (live) and Alpaca (US ETFs, free keys). Forecast and previous values: Forex Factory's free weekly feed.
+  Session and kill-zone times are worked out on this device and ignore holidays. Not investment advice.
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- markets ---------- */
+  const DAY = [
+    { id: "gold",  label: "GOLD",    sym: "OANDA:XAUUSD",    moves: "US data · Fed · dollar · fear",
+      fut: "COMEX:GC1!", futName: "COMEX gold futures (GC)", delay: "Free 10-min delay · live $7/mo" },
+    { id: "nas",   label: "NAS100",  sym: "OANDA:NAS100USD", moves: "US data · Fed · yields · big tech",
+      fut: "CME_MINI:NQ1!", futName: "CME Nasdaq-100 E-mini (NQ)", delay: "Free 10-min delay · live $7/mo" },
+    { id: "us30",  label: "US30",    sym: "OANDA:US30USD",   moves: "US data · Fed",
+      fut: "CBOT_MINI:YM1!", futName: "CBOT Dow E-mini (YM)", delay: "Free 10-min delay · live $7/mo" },
+    { id: "spx",   label: "S&P 500", sym: "OANDA:SPX500USD", moves: "US data · Fed",
+      fut: "CME_MINI:ES1!", futName: "CME S&P 500 E-mini (ES)", delay: "Free 10-min delay · live $7/mo" },
+    { id: "ger",   label: "GER40",   sym: "OANDA:DE30EUR",   moves: "ECB · German data · US data",
+      fut: "EUREX:FDAX1!", futName: "Eurex DAX futures (FDAX)", delay: "Free 15-min delay · live $2/mo" },
+    { id: "uk",    label: "UK100",   sym: "OANDA:UK100GBP",  moves: "BoE · UK data · oil · pound",
+      fut: "ICEEUR:Z1!", futName: "ICE FTSE 100 futures (Z)", delay: "Free 10-min delay · live $130/mo" }
+  ];
+  const tvLink = s => "https://www.tradingview.com/chart/?symbol=" + encodeURIComponent(s);
+
+  // Real traded volume that free embeddable charts are allowed to show
+  const VOLSRC = {
+    gold: [
+      { k: "gld", label: "GLD ETF", sym: "AMEX:GLD", tf: "5", us: true,
+        note: "<b>GLD</b> (SPDR Gold Shares, the biggest gold ETF, on NYSE Arca): real shares traded, so the bars show when US money is moving gold. Delayed, and only during US stock-market hours (<span class='ush'></span>)." },
+      { k: "bnc", label: "BINANCE GOLD 24/7", sym: "BINANCE:XAUUSDT.P", tf: "5",
+        note: "<b>Binance gold perpetual</b> (XAUUSDT): real-time and 24/7 with real traded volume, but these are crypto-exchange traders, not COMEX or London banks. Good for spotting when activity spikes, not for judging the size of big-money flows." }
+    ],
+    nas: [{ k: "qqq", label: "QQQ ETF", sym: "NASDAQ:QQQ", tf: "5", us: true,
+      note: "<b>QQQ</b> (Invesco QQQ, tracks the Nasdaq-100): real shares traded. Delayed, US stock-market hours only (<span class='ush'></span>)." }],
+    us30: [{ k: "dia", label: "DIA ETF", sym: "AMEX:DIA", tf: "5", us: true,
+      note: "<b>DIA</b> (SPDR Dow Jones ETF, tracks the Dow 30): real shares traded. Delayed, US stock-market hours only (<span class='ush'></span>)." }],
+    spx: [{ k: "spy", label: "SPY ETF", sym: "AMEX:SPY", tf: "5", us: true,
+      note: "<b>SPY</b> (SPDR S&amp;P 500 ETF, the most traded ETF in the world): real shares traded. Delayed, US stock-market hours only (<span class='ush'></span>)." }],
+    ger: [{ k: "fdax", label: "DAX FUTURES · DAILY", sym: "EUREX:FDAX1!", tf: "D",
+      note: "<b>Eurex DAX futures</b>: the real contract volume, but free embeddable charts only get end-of-day data — one bar per day, no intraday bars." }],
+    uk: []
+  };
+  let volSel = {};
+  const OANDA_BOOK = "https://www.oanda.com/bvi-en/cfds/tools/orderbook/";
+
+  /* ---------- news events ----------
+     t = release time in minutes after midnight, local to tz.
+     dates = official schedule (BLS, Federal Reserve, ECB, Bank of England).
+     Cell codes per market [GOLD, NAS100, US30, S&P, GER40, UK100]:
+     U/D strong, u/d usual, us/ds small, m quick spike, x mixed, n little effect */
+  const NYC = "America/New_York", FRA = "Europe/Berlin", LDN = "Europe/London";
+  const EVENTS = [
+    { id: "cpi", group: "US", name: "US inflation (CPI)", imp: "hi", by: "US Bureau of Labor Statistics",
+      tz: NYC, t: 510, freq: "Monthly, usually between the 10th and 15th", hits: "all six",
+      dates: ["2026-11-10", "2026-12-10", "2027-01-13", "2027-02-11", "2027-03-10"],
+      what: "How fast US prices are rising. It decides whether the Fed keeps rates high, so it moves the dollar, yields and everything you trade.",
+      rows: [
+        ["hi", "Higher than forecast", ["D", "D", "d", "d", "d", "ds"], "Rate cuts look further away (or hikes closer). Dollar and US yields jump, gold and NAS100 usually take the biggest hit."],
+        ["eq", "Close to forecast", ["m", "m", "m", "m", "m", "m"], "Quick spike both ways, then price tends to return to its earlier direction. Look at core CPI for the tie-breaker."],
+        ["lo", "Lower than forecast", ["U", "U", "u", "u", "u", "us"], "Rate relief. Dollar and yields drop, gold and NAS100 usually rally hardest."]
+      ],
+      watch: "Core CPI (without food and energy) matters more than the headline number." },
+    { id: "nfp", group: "US", name: "US jobs report (NFP)", imp: "hi", by: "US Bureau of Labor Statistics",
+      tz: NYC, t: 510, freq: "Monthly, usually the first Friday", hits: "all six",
+      dates: ["2026-11-06", "2026-12-04", "2027-01-08", "2027-02-05", "2027-03-05"],
+      what: "How many jobs the US added, the unemployment rate and wage growth. A strong job market keeps rates high.",
+      rows: [
+        ["hi", "Much stronger than forecast", ["D", "x", "x", "x", "x", "x"], "Dollar up, gold down. Indices fall if the market fears more rate hikes, but can rise if the worry was recession."],
+        ["eq", "Close to forecast", ["m", "m", "m", "m", "m", "m"], "Small move. Wages and the unemployment rate decide the direction."],
+        ["lo", "Much weaker than forecast", ["U", "x", "x", "x", "x", "x"], "Dollar down, gold up. Indices rise on rate relief, but a very weak number can sink them on recession fear."]
+      ],
+      watch: "Also check average hourly earnings (wages) and revisions to past months — they can flip the first reaction." },
+    { id: "fomc", group: "US", name: "Fed rate decision (FOMC)", imp: "hi", by: "US Federal Reserve",
+      tz: NYC, t: 840, extra: "press conference 30 min later", freq: "8 times a year", hits: "all six",
+      dates: ["2026-12-09", "2027-01-27", "2027-03-17", "2027-04-28", "2027-06-09", "2027-07-28", "2027-09-15", "2027-10-27", "2027-12-08"],
+      what: "The Fed sets US interest rates. Here the \"forecast\" is what traders have already priced in (check CME FedWatch before the meeting).",
+      rows: [
+        ["hi", "Tougher than expected", ["D", "D", "d", "d", "d", "ds"], "A bigger hike, more hikes signalled, or fewer cuts than hoped. Dollar and yields up; gold and indices down."],
+        ["eq", "As expected", ["m", "m", "m", "m", "m", "m"], "The statement barely moves price. The press conference 30 minutes later usually sets the real direction — expect whipsaws."],
+        ["lo", "Softer than expected", ["U", "U", "u", "u", "u", "us"], "A surprise cut, or a pause when a hike was expected. Dollar down; gold and indices up."]
+      ],
+      watch: "In March, June, September and December the Fed also publishes its rate forecasts (the \"dot plot\"), which can move markets as much as the decision." },
+    { id: "pce", group: "US", name: "US PCE inflation", imp: "md", by: "US Bureau of Economic Analysis",
+      tz: NYC, t: 510, freq: "Monthly, near the end of the month", hits: "all six",
+      what: "The Fed's favourite inflation measure. CPI and PPI usually hint at it first, so surprises are smaller than CPI.",
+      rows: [
+        ["hi", "Higher than forecast", ["d", "d", "ds", "ds", "ds", "n"], "Same direction as a hot CPI, but usually smaller."],
+        ["eq", "Close to forecast", ["m", "m", "m", "m", "m", "n"], "Often a non-event."],
+        ["lo", "Lower than forecast", ["u", "u", "us", "us", "us", "n"], "Same direction as a cool CPI, but usually smaller."]
+      ],
+      watch: "Core PCE is the number the Fed quotes." },
+    { id: "usother", group: "US", name: "Other US data", imp: "md", by: "US government agencies",
+      tz: NYC, t: 510, freq: "Retail sales, GDP and weekly jobless claims at 08:30 New York; ISM surveys at 10:00", hits: "mainly gold",
+      what: "Smaller releases. Same logic as the big ones: a stronger economy means rates stay high for longer.",
+      rows: [
+        ["hi", "Stronger than forecast", ["ds", "x", "x", "x", "n", "n"], "Dollar firmer, gold slightly lower. Indices mixed: good for company profits, bad for rates."],
+        ["eq", "Close to forecast", ["n", "n", "n", "n", "n", "n"], "Usually ignored."],
+        ["lo", "Weaker than forecast", ["us", "x", "x", "x", "n", "n"], "Dollar softer, gold slightly higher. Indices mixed."]
+      ],
+      watch: "These matter more when the market is nervous about rates or recession." },
+    { id: "ecb", group: "Europe & UK", name: "ECB rate decision", imp: "hi", by: "European Central Bank",
+      tz: FRA, t: 855, extra: "press conference 30 min later", freq: "About every 6 weeks, on a Thursday", hits: "GER40",
+      dates: ["2026-12-17", "2027-02-04", "2027-03-18", "2027-04-29", "2027-07-22", "2027-12-16"],
+      what: "Sets Eurozone interest rates. Moves the euro and GER40.",
+      rows: [
+        ["hi", "Tougher than expected", ["n", "n", "n", "n", "D", "n"], "Euro up, German stocks down."],
+        ["eq", "As expected", ["n", "n", "n", "n", "m", "n"], "Lagarde's press conference usually decides the move."],
+        ["lo", "Softer than expected", ["n", "n", "n", "n", "U", "n"], "Euro down, German stocks up."]
+      ],
+      watch: "The press conference often moves GER40 more than the decision itself." },
+    { id: "boe", group: "Europe & UK", name: "Bank of England rate decision", imp: "hi", by: "Bank of England",
+      tz: LDN, t: 720, freq: "8 times a year, on a Thursday", hits: "UK100",
+      dates: ["2026-11-05", "2026-12-17", "2027-02-04", "2027-03-18", "2027-04-29", "2027-06-17", "2027-07-29", "2027-09-16", "2027-11-04", "2027-12-16"],
+      what: "Sets UK interest rates. Moves the pound and UK100. FTSE companies earn a lot abroad, so a stronger pound hurts them.",
+      rows: [
+        ["hi", "Tougher than expected", ["n", "n", "n", "n", "n", "D"], "Pound up, UK100 down."],
+        ["eq", "As expected", ["n", "n", "n", "n", "n", "m"], "Watch the vote split — that's often the real surprise."],
+        ["lo", "Softer than expected", ["n", "n", "n", "n", "n", "U"], "Pound down, UK100 up."]
+      ],
+      watch: "The vote split (for example 5–4) is part of the surprise." },
+    { id: "ukcpi", group: "Europe & UK", name: "UK inflation (CPI)", imp: "md", by: "Office for National Statistics",
+      tz: LDN, t: 420, freq: "Monthly, usually a Wednesday mid-month", hits: "UK100",
+      what: "How fast UK prices are rising. Shapes the next Bank of England move.",
+      rows: [
+        ["hi", "Higher than forecast", ["n", "n", "n", "n", "n", "d"], "Pound up, UK100 down."],
+        ["eq", "Close to forecast", ["n", "n", "n", "n", "n", "m"], "Little change."],
+        ["lo", "Lower than forecast", ["n", "n", "n", "n", "n", "u"], "Pound down, UK100 up."]
+      ],
+      watch: "It lands before London opens, so the move shows up at the UK100 open." },
+    { id: "eucpi", group: "Europe & UK", name: "Eurozone & German inflation", imp: "md", by: "Eurostat · Destatis",
+      freq: "Monthly, around the end or start of the month — see the calendar for the exact time", hits: "GER40",
+      what: "Early ('flash') inflation readings. Shapes the next ECB move.",
+      rows: [
+        ["hi", "Higher than forecast", ["n", "n", "n", "n", "d", "n"], "Euro up, GER40 down."],
+        ["eq", "Close to forecast", ["n", "n", "n", "n", "m", "n"], "Little change."],
+        ["lo", "Lower than forecast", ["n", "n", "n", "n", "u", "n"], "Euro down, GER40 up."]
+      ],
+      watch: "German figures come out before the Eurozone number and often set the tone." },
+    { id: "china", group: "Europe & UK", name: "China data (PMIs, trade, growth)", imp: "md", by: "China's statistics bureau",
+      freq: "Monthly, usually early morning IST — shown in the calendar's + Swing view", hits: "GER40, UK100",
+      what: "China buys German machines and cars and lots of metals, so its economy matters for GER40 and UK100's miners.",
+      rows: [
+        ["hi", "Stronger than forecast", ["x", "n", "n", "n", "u", "u"], "Better for German exporters and UK miners."],
+        ["eq", "Close to forecast", ["n", "n", "n", "n", "n", "n"], "Usually ignored."],
+        ["lo", "Weaker than forecast", ["x", "n", "n", "n", "d", "d"], "Hurts German exporters and UK miners."]
+      ],
+      watch: "Moves happen in the Asian session, before your index markets get busy." },
+    { id: "tariff", group: "Unscheduled — any time", name: "US government: tariffs, trade, sanctions", imp: "un2", by: "The White House, US officials",
+      freq: "No schedule — often via social media posts, press briefings or interviews", hits: "all six",
+      what: "Policy announcements from the US government. These hit without warning, so they're the main reason to keep the headlines panel open.",
+      rows: [
+        ["hi", "New tariffs or trade war escalates", ["U", "D", "d", "d", "D", "d"], "Fear of slower growth. Gold up as a safe place; exporters like German carmakers hit hardest."],
+        ["eq", "Talk, no action", ["m", "m", "m", "m", "m", "m"], "Quick jolt, then fades."],
+        ["lo", "Deal, pause or relief", ["d", "U", "u", "u", "U", "u"], "Relief rally in indices, gold gives back gains."]
+      ],
+      watch: "Headlines can be walked back within hours — the first move often reverses." },
+    { id: "war", group: "Unscheduled — any time", name: "War, crisis or panic", imp: "un2", by: "World events",
+      freq: "No schedule", hits: "all six",
+      what: "Money runs to safety. The fear gauge (VIX) jumps.",
+      rows: [
+        ["hi", "Escalation or shock", ["U", "D", "D", "D", "D", "d"], "Gold up, indices down. UK100 holds up a bit better thanks to its oil companies."],
+        ["eq", "Tension, no change", ["us", "ds", "ds", "ds", "ds", "n"], "Nervous, choppy trading."],
+        ["lo", "Calm returns", ["d", "u", "u", "u", "u", "us"], "Gold gives back its fear premium; indices recover."]
+      ],
+      watch: "Check the fear gauge in Market mood — above 30 means panic." },
+    { id: "fedspeak", group: "Unscheduled — any time", name: "Fed speakers", imp: "un2", by: "Fed officials",
+      freq: "Speeches and interviews most weeks (except the quiet period before each Fed meeting)", hits: "all six",
+      what: "Officials hint at what comes next. The Fed chair moves markets most.",
+      rows: [
+        ["hi", "Sounds tougher", ["ds", "ds", "ds", "ds", "ds", "n"], "A smaller version of a tough Fed decision."],
+        ["eq", "Nothing new", ["n", "n", "n", "n", "n", "n"], "Ignored."],
+        ["lo", "Sounds softer", ["us", "us", "us", "us", "us", "n"], "A smaller version of a soft Fed decision."]
+      ],
+      watch: "The Fed chair's words count far more than other members'." }
+  ];
+  const MKT = ["GOLD", "NAS", "US30", "SPX", "GER", "UK"];
+  const SYMS = { U: "▲▲", u: "▲", us: "▲", D: "▼▼", d: "▼", ds: "▼", m: "↕", x: "mixed", n: "—" };
+  const q = (s, d) => ({ name: s, displayName: d });
+  const SWING = [
+    { name: "Forex majors", symbols: [q("OANDA:EURUSD","EUR/USD"), q("OANDA:GBPUSD","GBP/USD"), q("OANDA:USDJPY","USD/JPY"), q("OANDA:USDCHF","USD/CHF"), q("OANDA:AUDUSD","AUD/USD"), q("OANDA:USDCAD","USD/CAD"), q("OANDA:NZDUSD","NZD/USD")] },
+    { name: "Crosses", symbols: [q("OANDA:GBPJPY","GBP/JPY"), q("OANDA:EURJPY","EUR/JPY"), q("OANDA:EURGBP","EUR/GBP"), q("OANDA:AUDJPY","AUD/JPY"), q("OANDA:GBPAUD","GBP/AUD")] },
+    { name: "Other", symbols: [q("OANDA:XAGUSD","Silver"), q("OANDA:WTICOUSD","WTI oil (context)"), q("OANDA:JP225USD","Nikkei 225"), q("BITSTAMP:BTCUSD","Bitcoin")] }
+  ];
+  const TF = [["1","1m"],["5","5m"],["15","15m"],["60","1H"],["240","4H"],["D","D"]];
+  const TA_TF = { "1":"1m","5":"5m","15":"15m","60":"1h","240":"4h","D":"1D" };
+
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("dtt." + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem("dtt." + k, JSON.stringify(v)); } catch (e) {} }
+  };
+  const state = {
+    sel: store.get("sel", "gold"),
+    tf: store.get("tf", "5"),
+    news: store.get("news", "all"),
+    cal: store.get("cal", "day")
+  };
+  if (!DAY.find(m => m.id === state.sel)) state.sel = "gold";
+  const selM = () => DAY.find(m => m.id === state.sel);
+
+  /* ---------- widget mounting ---------- */
+  const BASE = "https://s3.tradingview.com/external-embedding/embed-widget-";
+  const DARK = { colorTheme: "dark", isTransparent: true, locale: "en" };
+  function mount(id, name, cfg, noCredit) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = "";
+    const wrap = document.createElement("div");
+    wrap.className = "tradingview-widget-container";
+    const inner = document.createElement("div");
+    inner.className = "tradingview-widget-container__widget";
+    wrap.appendChild(inner);
+    if (!noCredit) {
+      const cr = document.createElement("div");
+      cr.className = "tradingview-widget-copyright";
+      cr.innerHTML = '<a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank">Track all markets on TradingView</a>';
+      wrap.appendChild(cr);
+    }
+    const s = document.createElement("script");
+    s.type = "text/javascript"; s.async = true;
+    s.src = BASE + name + ".js";
+    s.text = JSON.stringify(cfg);
+    s.onerror = () => { el.innerHTML = '<div class="wfail"><div><b>Live data didn\'t load.</b><br>Open this file in Chrome with internet on.</div></div>'; };
+    wrap.appendChild(s);
+    el.appendChild(wrap);
+  }
+  const mini = (id, sym, range) => mount(id, "mini-symbol-overview", Object.assign({
+    symbol: sym, width: "100%", height: "100%", dateRange: range || "1D",
+    autosize: true, noTimeScale: true, chartOnly: false
+  }, DARK), true);
+
+  /* ---------- tiles ---------- */
+  function buildTiles() {
+    const box = document.getElementById("tiles");
+    DAY.forEach(m => {
+      const t = document.createElement("div");
+      t.className = "tile"; t.dataset.id = m.id;
+      const h = document.createElement("button");
+      h.type = "button"; h.className = "thead";
+      h.innerHTML = '<span class="tn"></span><span class="tc">CHART ▸</span>';
+      h.querySelector(".tn").textContent = m.label;
+      h.addEventListener("click", () => { select(m.id); document.getElementById("secChart").scrollIntoView({ behavior: "smooth", block: "start" }); });
+      const mv = document.createElement("div");
+      mv.className = "tmov"; mv.textContent = "Moves on: " + m.moves;
+      const b = document.createElement("div");
+      b.className = "tbody";
+      b.innerHTML = '<div class="wslot" id="t-' + m.id + '"></div>';
+      t.append(h, mv, b);
+      box.appendChild(t);
+    });
+    DAY.forEach(m => mini("t-" + m.id, m.sym, "1D"));
+  }
+
+  function select(id) {
+    state.sel = id; store.set("sel", id);
+    document.querySelectorAll(".tile").forEach(t => t.classList.toggle("sel", t.dataset.id === id));
+    const m = selM();
+    document.getElementById("chartTitle").textContent = m.label + " chart";
+    const rv = document.getElementById("rvLink");
+    rv.href = tvLink(m.fut); rv.textContent = "Real volume (" + m.fut.split(":")[1] + ") ↗";
+    document.getElementById("taTitle").textContent = m.label + " · indicator signals";
+    mountChart(); mountTa(); mountVol(); flowStart();
+    if (state.news === "sel") mountNews();
+  }
+
+  function mountVol() {
+    const m = selM(), list = VOLSRC[m.id] || [];
+    const box = document.getElementById("volTabs");
+    document.getElementById("volTitle").textContent = m.label + " · real volume bars";
+    box.innerHTML = "";
+    if (!list.length) {
+      document.getElementById("wVol").innerHTML = '<div class="volnone"><div><b>No free source can show FTSE volume here.</b><br>The real volume is on ICE FTSE 100 futures. TradingView shows them free with a 10-minute delay (use the button below); live data costs about $130 a month. Your UK100 chart above only has tick volume.</div></div>';
+      document.getElementById("volNote").innerHTML = "";
+      return;
+    }
+    const cur = list.find(s => s.k === volSel[m.id]) || list[0];
+    list.forEach(s => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "tab" + (s === cur ? " on" : ""); b.textContent = s.label;
+      b.addEventListener("click", () => { volSel[m.id] = s.k; mountVol(); });
+      box.appendChild(b);
+    });
+    mount("wVol", "advanced-chart", {
+      autosize: true, symbol: cur.sym, interval: cur.tf, timezone: "Asia/Kolkata",
+      theme: "dark", style: "1", locale: "en", backgroundColor: "#000000",
+      gridColor: "rgba(255,255,255,0.05)", allow_symbol_change: false, hide_side_toolbar: true,
+      hide_volume: false, withdateranges: false, details: false, hotlist: false, calendar: false,
+      save_image: false, support_host: "https://www.tradingview.com"
+    });
+    document.getElementById("volNote").innerHTML = cur.note + " The tall bars at the bottom are the volume.";
+    fillUsHours();
+  }
+  function fillUsHours() {
+    const now = new Date(), off = offsetMin("America/New_York", now), offI = offsetMin("Asia/Kolkata", now);
+    document.querySelectorAll(".ush").forEach(el => { el.textContent = hm(570 - off + offI) + "–" + hm(960 - off + offI) + " IST"; });
+  }
+
+  function mountChart() {
+    mount("wChart", "advanced-chart", {
+      autosize: true, symbol: selM().sym, interval: state.tf, timezone: "Asia/Kolkata",
+      theme: "dark", style: "1", locale: "en", backgroundColor: "#000000",
+      gridColor: "rgba(255,255,255,0.05)", allow_symbol_change: true, hide_side_toolbar: false,
+      withdateranges: true, details: false, hotlist: false, calendar: false, save_image: false,
+      support_host: "https://www.tradingview.com"
+    });
+  }
+  function mountTa() {
+    mount("wTa", "technical-analysis", Object.assign({
+      interval: TA_TF[state.tf] || "15m", width: "100%", height: "100%",
+      symbol: selM().sym, showIntervalTabs: true, displayMode: "single"
+    }, DARK));
+  }
+  function mountNews() {
+    let cfg;
+    if (state.news === "idx") cfg = { feedMode: "market", market: "index" };
+    else if (state.news === "fx") cfg = { feedMode: "market", market: "forex" };
+    else if (state.news === "sel") cfg = { feedMode: "symbol", symbol: selM().sym };
+    else cfg = { feedMode: "all_symbols" };
+    mount("wNews", "timeline", Object.assign({ width: "100%", height: "100%", displayMode: "regular" }, DARK, cfg));
+  }
+  function mountCal() {
+    const day = state.cal === "day";
+    mount("wCal", "events", Object.assign({
+      width: "100%", height: "100%",
+      importanceFilter: day ? "1" : "0,1",
+      countryFilter: day ? "us,gb,eu,de" : "us,gb,eu,de,jp,au,ca,ch,nz,cn"
+    }, DARK));
+  }
+
+  /* ---------- tabs ---------- */
+  function tabs(id, items, cur, onPick) {
+    const box = document.getElementById(id);
+    box.innerHTML = "";
+    items.forEach(([v, l]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "tab" + (v === cur ? " on" : ""); b.textContent = l; b.dataset.v = v;
+      b.addEventListener("click", () => { box.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === b)); onPick(v); });
+      box.appendChild(b);
+    });
+  }
+
+  /* ---------- time: sessions & kill zones ---------- */
+  const fmtCache = {};
+  const partsFmt = tz => fmtCache[tz] || (fmtCache[tz] = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hourCycle: "h23", weekday: "short", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+  const WD = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  function P(tz, d) {
+    const o = {}; for (const x of partsFmt(tz).formatToParts(d)) o[x.type] = x.value;
+    const h = (+o.hour) % 24;
+    return { y: +o.year, mo: +o.month, d: +o.day, h, mi: +o.minute, s: +o.second, wd: WD[o.weekday], mins: h * 60 + (+o.minute) };
+  }
+  function offsetMin(tz, d) {
+    const p = P(tz, d);
+    return Math.round((Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s) - Math.floor(d.getTime() / 1000) * 1000) / 60000);
+  }
+  const pad = n => String(n).padStart(2, "0");
+  const hm = m => { m = ((m % 1440) + 1440) % 1440; return pad(Math.floor(m / 60)) + ":" + pad(m % 60); };
+  const dur = m => { m = Math.max(0, Math.round(m)); const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mi = m % 60;
+    return d ? d + "d " + h + "h" : h ? h + "h " + pad(mi) + "m" : mi + "m"; };
+  const inWin = (m, s, e) => (s < e ? m >= s && m < e : m >= s || m < e);
+
+  const SESS = [
+    { n: "Tokyo", tz: "Asia/Tokyo", s: 540, e: 1080 },
+    { n: "London", tz: "Europe/London", s: 480, e: 1020 },
+    { n: "New York", tz: "America/New_York", s: 480, e: 1020 }
+  ];
+  // ICT kill zones, New York time
+  const KZ = [
+    { n: "Asian kill zone", s: 1200, e: 1440 },
+    { n: "London kill zone", s: 120, e: 300 },
+    { n: "New York kill zone", s: 420, e: 600 },
+    { n: "London close kill zone", s: 600, e: 720 }
+  ];
+  // Cash-market opens that make the indices jump (local exchange time)
+  const OPENS = [
+    { n: "Frankfurt open (GER40)", tz: "Europe/Berlin", s: 540, e: 570 },
+    { n: "London open (UK100)", tz: "Europe/London", s: 480, e: 510 },
+    { n: "Wall St open (NAS100, US30, S&P)", tz: "America/New_York", s: 570, e: 600 }
+  ];
+  const NY = "America/New_York", IST = "Asia/Kolkata";
+
+  function fxState(ny) {
+    const closed = ny.wd === 6 || (ny.wd === 5 && ny.mins >= 1020) || (ny.wd === 0 && ny.mins < 1020);
+    if (closed) return { open: false, until: ((7 - ny.wd) % 7) * 1440 + 1020 - ny.mins };
+    return { open: true, until: ((5 - ny.wd + 7) % 7) * 1440 + 1020 - ny.mins };
+  }
+
+  function tick() {
+    const now = new Date();
+    const ist = P(IST, now), ny = P(NY, now);
+    const offIst = offsetMin(IST, now), offNy = offsetMin(NY, now);
+    const fs = fxState(ny);
+
+    document.getElementById("istClock").innerHTML = pad(ist.h) + ":" + pad(ist.mi) + ":" + pad(ist.s) + "<small>IST</small>";
+    const badge = document.getElementById("fxBadge");
+    badge.textContent = fs.open ? "MARKETS OPEN" : "WEEKEND · CLOSED";
+    badge.className = "badge " + (fs.open ? "open" : "closed");
+
+    // one-line "right now"
+    let line;
+    if (!fs.open) {
+      line = "Markets reopen <b>Mon " + hm(1020 - offNy + offIst) + " IST</b> (in " + dur(fs.until) + ").";
+    } else {
+      const liveS = SESS.filter(x => { const p = P(x.tz, now); return p.wd >= 1 && p.wd <= 5 && inWin(p.mins, x.s, x.e); }).map(x => x.n);
+      const kz = KZ.find(k => inWin(ny.mins, k.s, k.e));
+      line = "Session: <b>" + (liveS.length ? liveS.join(" + ") : "quiet hours") + "</b>";
+      if (kz) {
+        line += " · <span class='live'>" + kz.n.toUpperCase() + " ACTIVE</span> (" + dur(((kz.e - ny.mins) + 1440) % 1440) + " left)";
+      } else {
+        let best = null;
+        KZ.forEach(k => { const a = ((k.s - ny.mins) + 1440) % 1440; if (a < fs.until && (!best || a < best.a)) best = { k, a }; });
+        if (best) line += " · Next: <b>" + best.k.n + "</b> at " + hm(best.k.s - offNy + offIst) + " IST (in " + dur(best.a) + ")";
+      }
+    }
+    document.getElementById("nowLine").innerHTML = line + (nextBigLine ? "<br>" + nextBigLine : "");
+
+    // timing panel
+    let html = "<h4>Kill zones <span>ICT, New York time → IST</span></h4>";
+    KZ.forEach(k => {
+      const live = fs.open && inWin(ny.mins, k.s, k.e);
+      const a = ((k.s - ny.mins) + 1440) % 1440;
+      const st = live ? "ACTIVE · " + dur(((k.e - ny.mins) + 1440) % 1440) + " left" : !fs.open ? "closed" : a >= fs.until ? "next week" : "in " + dur(a);
+      html += '<div class="row' + (live ? " live" : "") + '"><span class="nm">' + k.n + '</span><span class="st">' + st + '</span><span class="hrs">' +
+        hm(k.s - offNy + offIst) + "–" + hm(k.e - offNy + offIst) + " IST · " + hm(k.s) + "–" + hm(k.e) + " NY</span></div>";
+    });
+    html += "<h4>Index opens <span>first 30 min are wild</span></h4>";
+    OPENS.forEach(o => {
+      const p = P(o.tz, now), off = offsetMin(o.tz, now);
+      const live = p.wd >= 1 && p.wd <= 5 && inWin(p.mins, o.s, o.e);
+      const a = ((o.s - p.mins) + 1440) % 1440;
+      const startWd = (p.wd + (p.mins + a >= 1440 ? 1 : 0)) % 7;
+      const st = live ? "OPENING NOW" : (startWd === 0 || startWd === 6) ? "Mon" : "in " + dur(a);
+      html += '<div class="row' + (live ? " live" : "") + '"><span class="nm">' + o.n + '</span><span class="st">' + st + '</span><span class="hrs">' +
+        hm(o.s - off + offIst) + " IST</span></div>";
+    });
+    document.getElementById("timing").innerHTML = html;
+  }
+
+  /* ---------- position size ---------- */
+  const $ = id => document.getElementById(id);
+  const money = v => "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const KEYS = ["rBal", "rPct", "rInst", "rStop", "rRate", "rPt"];
+  KEYS.forEach(k => { const v = store.get(k, null); if (v != null) $(k).value = v; });
+
+  function calc() {
+    KEYS.forEach(k => store.set(k, $(k).value));
+    const bal = +$("rBal").value, pct = +$("rPct").value, inst = $("rInst").value;
+    const stop = +$("rStop").value, rate = +$("rRate").value, pt = +$("rPt").value;
+    document.querySelectorAll("#rPills .pill").forEach(b => b.classList.toggle("on", +b.dataset.r === pct));
+    const needRate = inst === "usdjpy" || inst === "usdxxx";
+    $("rRateRow").hidden = !needRate;
+    $("rPtRow").hidden = inst !== "index";
+    $("rRateLbl").textContent = inst === "usdxxx" ? "Pair rate (e.g. USDCAD)" : "USDJPY rate";
+    $("rStopLbl").textContent = inst === "index" ? "Stop loss (points)" : inst === "gold" ? "Stop loss ($ distance)" : "Stop loss (pips)";
+    const set = (r, l, a, b, w) => { $("oRisk").textContent = r; $("oLots").textContent = l; $("oR2").textContent = a; $("oR3").textContent = b; $("rWarn").textContent = w || ""; };
+
+    if (!(bal > 0) || !(pct > 0)) return set("—", "—", "—", "—", "Enter account size and risk %.");
+    const risk = bal * pct / 100;
+    let perLot;
+    if (inst === "index") { if (!(pt > 0)) return set(money(risk), "—", "—", "—", "Enter the $ value of 1 point for 1 lot (your broker's contract spec)."); perLot = pt; }
+    else if (inst === "gold") perLot = 100;            // 100 oz × $1
+    else if (inst === "xxxusd") perLot = 10;           // 100,000 × 0.0001
+    else { if (!(rate > 0)) return set(money(risk), "—", "—", "—", "Enter the current rate."); perLot = inst === "usdjpy" ? 1000 / rate : 10 / rate; }
+    if (!(stop > 0)) return set(money(risk), "—", "—", "—", "Enter your stop distance.");
+
+    const lots = Math.floor(risk / (stop * perLot) * 100 + 1e-9) / 100;
+    if (lots < 0.01) return set(money(risk), "< 0.01", "—", "—", "Stop is too wide for this risk — 0.01 lots would risk " + money(0.01 * stop * perLot) + ".");
+    const real = lots * stop * perLot;
+    set(money(risk), lots.toFixed(2) + " lots", "+" + money(real * 2), "+" + money(real * 3), pct > 1 ? "That's above your usual 0.5–1% risk." : "");
+  }
+  KEYS.forEach(k => { $(k).addEventListener("input", calc); $(k).addEventListener("change", calc); });
+  document.querySelectorAll("#rPills .pill").forEach(b => b.addEventListener("click", () => { $("rPct").value = b.dataset.r; calc(); }));
+
+  const dayKey = () => { const p = P(IST, new Date()); return "loss." + p.y + "-" + pad(p.mo) + "-" + pad(p.d); };
+  function renderLoss() {
+    const n = store.get(dayKey(), 0);
+    document.querySelectorAll(".lbox").forEach(b => b.classList.toggle("hit", +b.dataset.l <= n));
+    const m = $("stopMsg");
+    m.className = "stopmsg" + (n >= 2 ? " bad" : n === 1 ? " one" : "");
+    m.textContent = n >= 2 ? "DAILY STOP HIT — done for today" : n === 1 ? "1 loss today · one more and you stop" : "Clear to trade";
+  }
+  document.querySelectorAll(".lbox").forEach(b => b.addEventListener("click", () => {
+    const n = store.get(dayKey(), 0), l = +b.dataset.l;
+    store.set(dayKey(), n >= l ? l - 1 : l); renderLoss();
+  }));
+
+  /* ---------- news impact guide ---------- */
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const WDN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const CITY = { "America/New_York": "New York", "Europe/Berlin": "Frankfurt", "Europe/London": "London" };
+
+  // A wall-clock time on a date in a given city -> exact moment (handles daylight saving)
+  function zonedUtc(ds, min, tz) {
+    const [y, m, d] = ds.split("-").map(Number);
+    const guess = Date.UTC(y, m - 1, d, Math.floor(min / 60), min % 60);
+    const off = offsetMin(tz, new Date(guess));
+    let t = guess - off * 60000;
+    const off2 = offsetMin(tz, new Date(t));
+    if (off2 !== off) t = guess - off2 * 60000;
+    return t;
+  }
+  function nextOcc(ev, nowMs) {
+    if (!ev.dates) return null;
+    for (const ds of ev.dates) {
+      const t = zonedUtc(ds, ev.t, ev.tz);
+      if (t + 30 * 60000 > nowMs) return { t, live: t <= nowMs };
+    }
+    return null;
+  }
+  function istStamp(t) {
+    const p = P(IST, new Date(t));
+    return WDN[p.wd] + " " + p.d + " " + MON[p.mo - 1] + ", " + pad(p.h) + ":" + pad(p.mi) + " IST";
+  }
+  function istClockFor(ev, now) {
+    const off = offsetMin(ev.tz, now), offI = offsetMin(IST, now);
+    return hm(ev.t - off + offI) + " IST (" + hm(ev.t) + " " + CITY[ev.tz] + ")";
+  }
+  function untilText(o, nowMs) {
+    if (o.live) return "OUT NOW — compare actual vs forecast";
+    return "in " + dur((o.t - nowMs) / 60000);
+  }
+
+  function renderEvents() {
+    const now = new Date();
+    const card = ev => {
+      const rows = ev.rows.map(([k, lab, cells, why]) =>
+        '<div class="sc" data-k="' + k + '"><div class="lab ' + k + '">' + (k === "hi" ? "▲ " : k === "lo" ? "▼ " : "= ") + lab + '</div>' +
+        '<div class="chips">' + cells.map((c, i) => '<div class="chip"><i>' + MKT[i] + '</i><span class="' + (c === "n" ? "n0" : c) + '">' + SYMS[c] + '</span></div>').join("") + '</div>' +
+        '<div class="why">' + why + '</div></div>').join("");
+      const when = ev.tz
+        ? "<b>" + istClockFor(ev, now) + "</b>" + (ev.extra ? ", " + ev.extra : "") + " · " + ev.freq
+        : ev.freq;
+      const nxt = (ev.dates ? '<br>Next: <b id="evn-' + ev.id + '">…</b>' : "") + '<span class="evf" id="evf-' + ev.id + '"></span>';
+      const impTxt = ev.imp === "hi" ? "HIGH" : ev.imp === "md" ? "MEDIUM" : "ANY TIME";
+      return '<details class="ev" id="ev-' + ev.id + '"><summary><span class="n">' + ev.name + '</span><span class="imp ' + ev.imp + '">' + impTxt + '</span>' +
+        '<span class="when">' + when + nxt + '<br>Moves: ' + ev.hits + '</span></summary>' +
+        '<div class="evbody"><div class="evlive" id="evv-' + ev.id + '"></div><div class="what">' + ev.what + ' <span style="color:var(--dim)">Published by: ' + ev.by + '.</span></div>' + rows +
+        '<div class="watch"><b>Watch:</b> ' + ev.watch + '</div></div></details>';
+    };
+    const group = g => '<div class="evgroup">' + g + '</div>' + EVENTS.filter(e => e.group === g).map(card).join("");
+    document.getElementById("evCards").innerHTML =
+      '<div class="evcols"><div>' + group("US") + group("Unscheduled — any time") + '</div><div>' + group("Europe & UK") + '</div></div>';
+  }
+
+  let nextBigLine = "";
+  function updateEvents() {
+    const nowMs = Date.now();
+    const ups = [];
+    EVENTS.forEach(ev => {
+      const o = nextOcc(ev, nowMs);
+      const el = document.getElementById("evn-" + ev.id);
+      if (el) el.textContent = o ? istStamp(o.t) + " · " + untilText(o, nowMs) : "see the calendar";
+      if (o) ups.push({ ev, o });
+    });
+    ups.sort((a, b) => a.o.t - b.o.t);
+    document.getElementById("upNext").innerHTML = ups.slice(0, 5).map(({ ev, o }) => {
+      const soon = !o.live && o.t - nowMs < 24 * 3600000;
+      return '<div class="un' + (o.live ? " live" : soon ? " soon" : "") + '"><span class="w"><b>' + ev.name + '</b></span><span class="c">' + untilText(o, nowMs).replace(" — compare actual vs forecast", "") + '</span>' +
+        '<span class="k">' + istStamp(o.t) + ' · moves ' + ev.hits + esc(relForUpNext(ev, o.t)) + '</span></div>';
+    }).join("") || '<div class="un"><span class="w">No dates loaded — check the calendar.</span></div>';
+    if (ups.length) {
+      const { ev, o } = ups[0];
+      nextBigLine = "Next big news: <b>" + ev.name + "</b> " + (o.live ? "<span class='live'>OUT NOW</span>" : istStamp(o.t) + " (" + untilText(o, nowMs) + ")");
+    }
+    if (REL.length) paintRel();
+  }
+  document.getElementById("evCards").addEventListener("click", e => {
+    // keep only one card open at a time on phones
+    const s = e.target.closest("summary");
+    if (!s || window.innerWidth >= 1100) return;
+    const d = s.parentElement;
+    if (!d.open) document.querySelectorAll("details.ev[open]").forEach(x => { if (x !== d) x.open = false; });
+  });
+
+  /* ---------- volume ---------- */
+  function renderVolume() {
+    document.getElementById("vTable").innerHTML = DAY.map(m =>
+      '<div class="vrow"><span class="vm">' + m.label + '</span><span class="vl">' +
+      '<a class="vbtn" href="' + tvLink(m.fut) + '" target="_blank" rel="noopener">Futures chart ↗</a>' +
+      (m.id === "gold" ? '<a class="vbtn alt" href="' + OANDA_BOOK + '" target="_blank" rel="noopener">Order book ↗</a>' : "") +
+      '</span><span class="vs">' + m.futName + '<br>' + m.delay + '</span></div>').join("");
+    const now = new Date();
+    const offNy = offsetMin(NY, now), offI = offsetMin(IST, now);
+    const ist = 930 - offNy + offI;
+    document.getElementById("cotTime").textContent = "Friday 15:30 New York (" + (ist >= 1440 ? "Sat " : "Fri ") + hm(ist) + " IST)";
+  }
+
+  /* ---------- order flow: footprint + volume profile ----------
+     Binance USDⓈ-M futures (live, real aggressor side) and Alpaca (US ETFs, free keys). */
+  const FLOW = {
+    gold: [
+      { k: "bxau", type: "bn", sym: "XAUUSDT", label: "BINANCE GOLD · LIVE", name: "Binance gold (XAUUSDT)", base: 0.1, cdp: 2 },
+      { k: "agld", type: "ap", sym: "GLD", label: "GLD ETF", name: "GLD gold ETF", base: 0.01, cdp: 2 } ],
+    nas: [
+      { k: "aqqq", type: "ap", sym: "QQQ", label: "QQQ ETF", name: "QQQ (Nasdaq-100 ETF)", base: 0.01, cdp: 1 },
+      { k: "bqqq", type: "bn", sym: "QQQUSDT", label: "BINANCE QQQ · LIVE", name: "Binance QQQ perpetual", base: 0.01, cdp: 1 } ],
+    spx: [
+      { k: "aspy", type: "ap", sym: "SPY", label: "SPY ETF", name: "SPY (S&P 500 ETF)", base: 0.01, cdp: 1 },
+      { k: "bspy", type: "bn", sym: "SPYUSDT", label: "BINANCE SPY · LIVE", name: "Binance SPY perpetual", base: 0.01, cdp: 1 } ],
+    us30: [
+      { k: "adia", type: "ap", sym: "DIA", label: "DIA ETF", name: "DIA (Dow 30 ETF)", base: 0.01, cdp: 1 } ],
+    ger: [], uk: []
+  };
+  const CFD_HINT = { gold: "e.g. 3950.20", nas: "e.g. 25010", spx: "e.g. 6850", us30: "e.g. 47500" };
+  const UPC = "#3ddc84", DNC = "#ff5252", AMB = "#ffa028", BLU = "#5ab0ff";
+  const FH = 420;
+  let MONO = "monospace";
+  try { MONO = getComputedStyle(document.body).fontFamily || MONO; } catch (e) {}
+
+  const F = {
+    gen: 0, src: null, ws: null, c: new Map(), n: 0, last: 0, lastT: 0, base: 0.01,
+    conn: "", err: "", hist: "", restMaxId: -1, liveMinId: null, restMaxT: 0, liveMinT: null,
+    dirty: true, drawn: 0, retry: 0,
+    tf: +store.get("flowTf", 5), win: +store.get("flowWin", 60), pr: store.get("flowPr", "win"),
+    pick: store.get("flowSrc", {})
+  };
+  const AP = { ws: null, feed: store.get("apFeed", "delayed_sip"), ready: false, sub: null, bp: 0, ap: 0, lp: 0, ls: true, retry: 0, fatal: false };
+  const apKeys = () => ({ k: store.get("apKey", ""), s: store.get("apSec", "") });
+  const parseT = s => Date.parse(String(s).replace(/(\.\d{3})\d+/, "$1"));
+  const clockIST = t => { const p = P(IST, new Date(t)); return pad(p.h) + ":" + pad(p.mi); };
+
+  function addTrade(t, p, q, buy) {
+    if (!(p > 0) || !(q > 0) || !isFinite(t)) return;
+    const m = Math.floor(t / 60000) * 60000;
+    let c = F.c.get(m);
+    if (!c) { c = { o: p, h: p, l: p, c: p, b: 0, s: 0, lv: new Map(), ft: t, lt: t }; F.c.set(m, c); }
+    else {
+      if (t < c.ft) { c.ft = t; c.o = p; }
+      if (t >= c.lt) { c.lt = t; c.c = p; }
+      if (p > c.h) c.h = p; if (p < c.l) c.l = p;
+    }
+    const k = Math.round(p / F.base);
+    let a = c.lv.get(k);
+    if (!a) c.lv.set(k, a = [0, 0]);
+    if (buy) { a[0] += q; c.b += q; } else { a[1] += q; c.s += q; }
+    F.n++;
+    if (t >= F.lastT) { F.lastT = t; F.last = p; }
+    F.dirty = true;
+  }
+
+  function flowReset() {
+    F.c = new Map(); F.n = 0; F.last = 0; F.lastT = 0; F.err = ""; F.hist = "";
+    F.restMaxId = -1; F.liveMinId = null; F.restMaxT = 0; F.liveMinT = null; F.retry = 0; F.dirty = true;
+  }
+  function bnClose() { if (F.ws) { F.ws.onclose = null; F.ws.onmessage = null; try { F.ws.close(); } catch (e) {} F.ws = null; } }
+  function apClose() { if (AP.ws) { AP.ws.onclose = null; AP.ws.onmessage = null; try { AP.ws.close(); } catch (e) {} } AP.ws = null; AP.ready = false; AP.sub = null; }
+
+  function flowMsg(html) {
+    const a = document.getElementById("fpMsg"), b = document.getElementById("vpMsg");
+    a.innerHTML = html || "";
+    b.innerHTML = html ? "<div>The volume profile appears here once trades flow.</div>" : "";
+    a.classList.toggle("on", !!html); b.classList.toggle("on", !!html);
+    F.blocked = !!html;
+  }
+
+  function flowStart() {
+    const m = selM(), list = FLOW[m.id] || [];
+    F.gen++; bnClose(); flowReset();
+    document.getElementById("flowTitle").textContent = m.label + " · order flow & volume profile";
+    document.getElementById("cfdNow").placeholder = CFD_HINT[m.id] || "";
+    document.getElementById("cfdNow").value = "";
+    const box = document.getElementById("flowSrc");
+    box.innerHTML = "";
+    if (!list.length) {
+      F.src = null; apClose();
+      flowMsg("<div><b>No free order-flow data exists for " + m.label + ".</b><br>Its real volume trades on " +
+        (m.id === "ger" ? "Eurex DAX futures" : "ICE FTSE 100 futures") + ", which only sell tick-by-tick data. " +
+        "The volume panel above has the free (delayed) futures chart. Pick GOLD, NAS100, US30 or S&amp;P 500 for a footprint.</div>");
+      drawFlow(); return;
+    }
+    const keys = apKeys();
+    let src = list.find(s => s.k === F.pick[m.id]);
+    if (!src) src = list.find(s => s.type === (keys.k ? "ap" : "bn")) || list[0];
+    if (m.id === "gold" && !F.pick[m.id]) src = list[0];
+    list.forEach(s => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "tab" + (s === src ? " on" : ""); b.textContent = s.label;
+      b.addEventListener("click", () => { F.pick[m.id] = s.k; store.set("flowSrc", F.pick); flowStart(); });
+      box.appendChild(b);
+    });
+    F.src = src; F.base = src.base; F.conn = "wait";
+    flowMsg("");
+    if (src.type === "bn") {
+      apClose();
+      bnOpen(src, F.gen);
+      bnHistory(src, F.gen);
+    } else {
+      if (!keys.k || !keys.s) {
+        apClose(); F.conn = "";
+        flowMsg("<div><b>" + src.sym + " needs free Alpaca keys</b> (a 5-minute, one-time setup — open the box below this chart).<br>" +
+          (list.some(s => s.type === "bn") ? "Or tap <b>" + list.find(s => s.type === "bn").label + "</b> above for a live feed with no setup." : "") + "</div>");
+        document.getElementById("flowKeys").open = true;
+        drawFlow(); return;
+      }
+      AP.lp = 0; AP.bp = AP.ap = 0;
+      if (AP.ws && AP.ready && AP.wsFeed === AP.feed) apSub();
+      else if (!AP.ws || AP.wsFeed !== AP.feed) apOpen();
+      apHistory(src, F.gen);
+    }
+    drawFlow();
+  }
+
+  /* Binance: wss://fstream.binance.com/market/ws/<sym>@aggTrade — m=true means the seller hit the bid */
+  function bnOpen(src, g) {
+    let ws;
+    try { ws = new WebSocket("wss://fstream.binance.com/market/ws/" + src.sym.toLowerCase() + "@aggTrade"); }
+    catch (e) { F.conn = "error"; F.err = "can't open connection"; flowStatus(); return; }
+    F.ws = ws;
+    ws.onopen = () => { if (g !== F.gen) return; F.conn = "live"; F.retry = 0; flowStatus(); };
+    ws.onmessage = e => {
+      if (g !== F.gen) return;
+      let d; try { d = JSON.parse(e.data); } catch (x) { return; }
+      if (d.e !== "aggTrade") return;
+      if (d.a <= F.restMaxId) return;
+      if (F.liveMinId == null) F.liveMinId = d.a;
+      F.conn = "live";
+      addTrade(d.T, +d.p, +d.q, !d.m);
+    };
+    ws.onclose = () => {
+      if (g !== F.gen) return;
+      F.conn = "retry"; flowStatus();
+      const wait = Math.min(30000, 1500 * Math.pow(2, F.retry++));
+      setTimeout(() => { if (g === F.gen) bnOpen(src, g); }, wait);
+    };
+  }
+  async function bnHistory(src, g) {
+    const url = "https://fapi.binance.com/fapi/v1/aggTrades?symbol=" + src.sym + "&limit=1000";
+    const pages = [];
+    F.hist = "loading";
+    try {
+      let r = await fetch(url);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      let arr = await r.json();
+      if (g !== F.gen) return;
+      pages.unshift(arr);
+      while (pages.length < 15 && arr.length && Date.now() - arr[0].T < 6 * 3600000) {
+        const from = arr[0].a - 1000;
+        if (from < 0) break;
+        r = await fetch(url + "&fromId=" + from);
+        if (!r.ok) break;
+        arr = await r.json();
+        if (g !== F.gen) return;
+        pages.unshift(arr);
+      }
+    } catch (e) {
+      if (g === F.gen && !pages.length) { F.hist = "none"; flowStatus(); }
+      if (!pages.length) return;
+    }
+    let mx = F.restMaxId, cnt = 0;
+    pages.forEach(arr => arr.forEach(x => {
+      if (F.liveMinId != null && x.a >= F.liveMinId) return;
+      addTrade(x.T, +x.p, +x.q, !x.m); cnt++;
+      if (x.a > mx) mx = x.a;
+    }));
+    F.restMaxId = mx; F.hist = cnt ? "ok" : "none"; F.dirty = true;
+  }
+
+  /* Alpaca: one stream connection, swap the subscribed symbol */
+  function apOpen() {
+    apClose();
+    const keys = apKeys();
+    const feed = AP.feed === "iex" ? "iex" : "delayed_sip";
+    let ws;
+    try { ws = new WebSocket("wss://stream.data.alpaca.markets/v2/" + feed); }
+    catch (e) { F.conn = "error"; F.err = "can't open connection"; flowStatus(); return; }
+    AP.ws = ws; AP.wsFeed = AP.feed; AP.ready = false; AP.sub = null; AP.fatal = false;
+    if (F.src && F.src.type === "ap") { F.conn = "wait"; flowStatus(); }
+    ws.onmessage = e => {
+      if (AP.ws !== ws) return;
+      let arr; try { arr = JSON.parse(e.data); } catch (x) { return; }
+      if (!Array.isArray(arr)) arr = [arr];
+      for (const m of arr) {
+        if (m.T === "t") { if (m.S === AP.sub && F.src && F.src.type === "ap" && F.src.sym === m.S) apTrade(m); }
+        else if (m.T === "q") { if (m.S === AP.sub) { AP.bp = +m.bp; AP.ap = +m.ap; } }
+        else if (m.T === "success" && m.msg === "connected") ws.send(JSON.stringify({ action: "auth", key: keys.k, secret: keys.s }));
+        else if (m.T === "success" && m.msg === "authenticated") { AP.ready = true; AP.retry = 0; apSub(); }
+        else if (m.T === "subscription") { if (F.src && F.src.type === "ap") { F.conn = "live"; flowStatus(); } }
+        else if (m.T === "error") apError(m.code, m.msg);
+      }
+    };
+    ws.onclose = () => {
+      if (AP.ws !== ws) return;
+      AP.ws = null; AP.ready = false; AP.sub = null;
+      if (AP.fatal || !F.src || F.src.type !== "ap") return;
+      F.conn = "retry"; flowStatus();
+      const wait = Math.min(30000, 2000 * Math.pow(2, AP.retry++));
+      setTimeout(() => { if (!AP.ws && F.src && F.src.type === "ap") apOpen(); }, wait);
+    };
+  }
+  function apSub() {
+    if (!AP.ws || !AP.ready) return;
+    const want = F.src && F.src.type === "ap" ? F.src.sym : null;
+    if (AP.sub && AP.sub !== want) AP.ws.send(JSON.stringify({ action: "unsubscribe", trades: [AP.sub], quotes: [AP.sub] }));
+    if (want && AP.sub !== want) { AP.bp = AP.ap = 0; AP.ws.send(JSON.stringify({ action: "subscribe", trades: [want], quotes: [want] })); }
+    AP.sub = want;
+  }
+  function apError(code, msg) {
+    const fatal = { 402: "Alpaca rejected the keys — check them in the setup box below",
+      409: "this feed needs a paid Alpaca plan — pick FULL MARKET · 15-MIN DELAY below",
+      401: "Alpaca rejected the keys — check them in the setup box below" };
+    if (fatal[code]) { AP.fatal = true; F.conn = "error"; F.err = fatal[code]; apClose(); }
+    else if (code === 406) { F.conn = "error"; F.err = "Alpaca allows one live connection — close other tabs using these keys (retrying)"; }
+    else { F.conn = "error"; F.err = "Alpaca: " + (msg || "error " + code); }
+    flowStatus();
+  }
+  function apSide(p) {
+    let buy = null;
+    if (AP.ap > 0 && AP.bp > 0 && AP.ap >= AP.bp) {
+      if (p >= AP.ap) buy = true;
+      else if (p <= AP.bp) buy = false;
+      else { const mid = (AP.ap + AP.bp) / 2; buy = p > mid ? true : p < mid ? false : null; }
+    }
+    if (buy === null) buy = p > AP.lp ? true : p < AP.lp ? false : AP.ls;
+    AP.lp = p; AP.ls = buy;
+    return buy;
+  }
+  function apTrade(m) {
+    const t = parseT(m.t);
+    if (!t || t <= F.restMaxT) return;
+    if (F.liveMinT == null) F.liveMinT = t;
+    F.conn = "live";
+    addTrade(t, +m.p, +m.s, apSide(+m.p));
+  }
+  async function apHistory(src, g) {
+    const keys = apKeys(), feed = AP.feed === "iex" ? "iex" : "sip";
+    const end = new Date(Date.now() - (feed === "sip" ? 16 * 60000 : 2000));
+    const start = new Date(end.getTime() - 4 * 86400000);
+    const all = [];
+    let token = null, pages = 0;
+    F.hist = "loading";
+    try {
+      do {
+        let url = "https://data.alpaca.markets/v2/stocks/" + src.sym + "/trades?feed=" + feed + "&limit=10000&sort=desc&start=" +
+          start.toISOString() + "&end=" + end.toISOString();
+        if (token) url += "&page_token=" + encodeURIComponent(token);
+        const r = await fetch(url, { headers: { "APCA-API-KEY-ID": keys.k, "APCA-API-SECRET-KEY": keys.s } });
+        if (g !== F.gen) return;
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const j = await r.json();
+        if (g !== F.gen) return;
+        (j.trades || []).forEach(x => all.push(x));
+        token = j.next_page_token; pages++;
+        if (all.length > 1 && parseT(all[0].t) - parseT(all[all.length - 1].t) > 3 * 3600000) break;
+      } while (token && pages < 5);
+    } catch (e) {
+      if (g === F.gen && !all.length) { F.hist = "none"; flowStatus(); }
+      if (!all.length) return;
+    }
+    all.reverse();
+    let lp = 0, ls = true, mx = F.restMaxT, cnt = 0;
+    for (const x of all) {
+      const t = parseT(x.t), p = +x.p;
+      const b = p > lp ? true : p < lp ? false : ls;
+      lp = p; ls = b;
+      if (F.liveMinT != null && t >= F.liveMinT) continue;
+      addTrade(t, p, +x.s, b); cnt++;
+      if (t > mx) mx = t;
+    }
+    F.restMaxT = mx; F.hist = cnt ? "ok" : "none"; F.dirty = true;
+  }
+
+  /* ---------- drawing ---------- */
+  const LADDER = [0.01, 0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 20, 25, 50, 100, 200, 250, 500];
+  function pickTicks(rangeTicks, rows) {
+    for (const s of LADDER) {
+      const st = s / F.base;
+      if (st < 0.999 || Math.abs(st - Math.round(st)) > 1e-6) continue;
+      if (rangeTicks / Math.round(st) + 2 <= rows) return Math.round(st);
+    }
+    return Math.round(LADDER[LADDER.length - 1] / F.base);
+  }
+  const decOf = ticks => { const s = +(ticks * F.base).toFixed(4); const f = String(s).split(".")[1]; return f ? f.length : 0; };
+  function fmtV(v) {
+    const a = Math.abs(v);
+    if (a >= 1e6) return (v / 1e6).toFixed(a >= 1e7 ? 0 : 1) + "M";
+    if (a >= 1e4) return Math.round(v / 1e3) + "K";
+    if (a >= 1e3) return (v / 1e3).toFixed(1) + "K";
+    if (a >= 10) return String(Math.round(v));
+    if (a >= 1) return v.toFixed(1);
+    if (a === 0) return "0";
+    return v.toFixed(2);
+  }
+  const anchorT = () => F.lastT || Date.now();
+  function candles() {
+    const tf = F.tf * 60000, end = Math.floor(anchorT() / tf) * tf, n = Math.max(1, Math.round(F.win / F.tf));
+    const out = [];
+    for (let i = n - 1; i >= 0; i--) {
+      const t0 = end - i * tf;
+      let c = null;
+      for (let mt = t0; mt < t0 + tf; mt += 60000) {
+        const x = F.c.get(mt);
+        if (!x) continue;
+        if (!c) c = { t: t0, o: x.o, h: x.h, l: x.l, c: x.c, b: 0, s: 0, lv: new Map(), ft: x.ft, lt: x.lt };
+        else {
+          if (x.ft < c.ft) { c.ft = x.ft; c.o = x.o; }
+          if (x.lt >= c.lt) { c.lt = x.lt; c.c = x.c; }
+          if (x.h > c.h) c.h = x.h; if (x.l < c.l) c.l = x.l;
+        }
+        c.b += x.b; c.s += x.s;
+        x.lv.forEach((a, k) => { const y = c.lv.get(k); if (y) { y[0] += a[0]; y[1] += a[1]; } else c.lv.set(k, [a[0], a[1]]); });
+      }
+      out.push(c || { t: t0, empty: true });
+    }
+    return out;
+  }
+  function canvasCtx(id, h) {
+    const cv = document.getElementById(id);
+    const w = Math.max(200, cv.parentElement.clientWidth || 300), dpr = window.devicePixelRatio || 1;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    }
+    cv.style.height = h + "px";
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.textBaseline = "middle";
+    return { ctx, w, h };
+  }
+  function waitText() {
+    if (!F.src) return "";
+    if (F.conn === "error") return "<div><b>" + F.err + "</b></div>";
+    if (F.src.type === "ap" && F.hist !== "loading" && !F.n)
+      return "<div><b>No " + F.src.sym + " trades yet.</b><br>US funds trade " + usHoursIST() + ". The 15-minute-delayed feed starts showing them 15 minutes after the open.</div>";
+    return "<div><b>Waiting for trades…</b><br>Each candle fills in as trades arrive.</div>";
+  }
+  function usHoursIST() {
+    const now = new Date(), off = offsetMin(NY, now), offI = offsetMin(IST, now);
+    return "9:30–16:00 New York (" + hm(570 - off + offI) + "–" + hm(960 - off + offI) + " IST), with thinner extended hours " + hm(240 - off + offI) + "–" + hm(1200 - off + offI) + " IST";
+  }
+
+  function drawFootprint() {
+    const { ctx, w, h } = canvasCtx("fpCanvas", FH);
+    const msg = document.getElementById("fpMsg");
+    if (!F.src || F.blocked) return;
+    const axisW = 60, headH = 20, footH = 36, plotW = w - axisW, plotH = h - headH - footH - 4;
+    const all = candles();
+    const fit = Math.max(2, Math.floor(plotW / 74));
+    let cols = all.slice(-fit);
+    const firstFull = cols.findIndex(c => !c.empty);
+    if (firstFull > 0) cols = cols.slice(firstFull);
+    const live = cols.filter(c => !c.empty);
+    if (!live.length) { msg.innerHTML = waitText(); msg.classList.add("on"); return; }
+    msg.classList.remove("on");
+    let kl = Infinity, kh = -Infinity;
+    live.forEach(c => { kl = Math.min(kl, Math.round(c.l / F.base)); kh = Math.max(kh, Math.round(c.h / F.base)); });
+    const st = pickTicks(kh - kl, Math.floor(plotH / 14));
+    const r0 = Math.floor(kl / st), r1 = Math.floor(kh / st), nR = r1 - r0 + 1;
+    const rh = Math.min(22, plotH / nR), top = headH + (plotH - rh * nR) / 2;
+    const yOf = r => top + (r1 - r) * rh;
+    const rowOf = p => Math.floor(Math.round(p / F.base) / st);
+    const cw = plotW / cols.length;
+    let maxCell = 0;
+    const grids = cols.map(c => {
+      if (c.empty) return null;
+      const g = new Map();
+      c.lv.forEach((a, k) => { const r = Math.floor(k / st); const y = g.get(r); if (y) { y[0] += a[0]; y[1] += a[1]; } else g.set(r, [a[0], a[1]]); });
+      g.forEach(a => { if (a[0] + a[1] > maxCell) maxCell = a[0] + a[1]; });
+      return g;
+    });
+    const dec = decOf(st);
+    // price axis
+    ctx.font = "10px " + MONO; ctx.textAlign = "left";
+    const every = Math.max(1, Math.ceil(13 / rh));
+    for (let r = r1; r >= r0; r--) {
+      if ((r1 - r) % every) continue;
+      ctx.fillStyle = "#5a5a5a";
+      ctx.fillText((r * st * F.base).toFixed(dec), plotW + 6, yOf(r) + rh / 2);
+    }
+    // last price
+    if (F.last) {
+      const lr = rowOf(F.last);
+      if (lr >= r0 && lr <= r1) {
+        const y = yOf(lr);
+        ctx.fillStyle = "rgba(90,176,255,.12)"; ctx.fillRect(0, y, plotW, rh);
+        ctx.fillStyle = BLU; ctx.fillRect(plotW + 2, y, axisW - 2, rh);
+        ctx.fillStyle = "#000"; ctx.font = "bold 10px " + MONO;
+        ctx.fillText(F.last.toFixed(Math.max(dec, 2)), plotW + 5, y + rh / 2);
+      }
+    }
+    // footer labels
+    ctx.font = "10px " + MONO; ctx.fillStyle = "#5a5a5a"; ctx.textAlign = "left";
+    ctx.fillText("Δ", plotW + 6, h - footH + 11);
+    ctx.fillText("VOL", plotW + 6, h - footH + 27);
+    cols.forEach((c, i) => {
+      const x0 = i * cw, mid = x0 + cw / 2;
+      ctx.textAlign = "center"; ctx.font = "10px " + MONO; ctx.fillStyle = "#8e8e8e";
+      ctx.fillText(clockIST(c.t), mid, 10);
+      ctx.fillStyle = "#1e1e1e"; ctx.fillRect(x0 + cw - 1, headH - 4, 1, h - headH);
+      if (c.empty) return;
+      const g = grids[i];
+      let pocR = null, pocV = -1;
+      g.forEach((a, r) => { const v = a[0] + a[1]; if (v > pocV) { pocV = v; pocR = r; } });
+      // candle stick on the left edge
+      const rO = rowOf(c.o), rC = rowOf(c.c), rH = rowOf(c.h), rL = rowOf(c.l);
+      ctx.fillStyle = c.c >= c.o ? UPC : DNC;
+      ctx.fillRect(x0 + 4, yOf(rH) + 1, 1, (rH - rL + 1) * rh - 2);
+      ctx.fillRect(x0 + 2.5, yOf(Math.max(rO, rC)) + 1, 4, (Math.abs(rO - rC) + 1) * rh - 2);
+      const cx0 = x0 + 10, cw2 = cw - 13, cm = cx0 + cw2 / 2;
+      g.forEach((a, r) => {
+        const y = yOf(r), v = a[0] + a[1];
+        ctx.fillStyle = "rgba(255,255,255," + (0.03 + 0.14 * v / maxCell).toFixed(3) + ")";
+        ctx.fillRect(cx0, y + 1, cw2, rh - 2);
+        let stroke = null;
+        const big = v >= maxCell * 0.04;
+        if (big && a[0] > 0 && a[0] >= 3 * a[1]) stroke = UPC;
+        else if (big && a[1] > 0 && a[1] >= 3 * a[0]) stroke = DNC;
+        if (r === pocR) stroke = AMB;
+        if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = r === pocR ? 1.5 : 1; ctx.strokeRect(cx0 + 0.75, y + 1.75, cw2 - 1.5, rh - 3.5); }
+        if (rh < 10) return;
+        const sv = fmtV(a[1]), bv = fmtV(a[0]);
+        let fs = Math.min(11, Math.floor(rh - 3));
+        ctx.font = fs + "px " + MONO;
+        if (ctx.measureText(sv + " × " + bv).width > cw2 - 4) { fs = Math.max(8, fs - 2); ctx.font = fs + "px " + MONO; }
+        if (ctx.measureText(sv + "×" + bv).width > cw2 - 2) return;
+        const yy = y + rh / 2;
+        ctx.textAlign = "right"; ctx.fillStyle = a[1] ? "#ff8a8a" : "#444"; ctx.fillText(sv, cm - 4, yy);
+        ctx.textAlign = "center"; ctx.fillStyle = "#555"; ctx.fillText("×", cm, yy);
+        ctx.textAlign = "left"; ctx.fillStyle = a[0] ? "#72e8a6" : "#444"; ctx.fillText(bv, cm + 4, yy);
+      });
+      const d = c.b - c.s;
+      ctx.textAlign = "center"; ctx.font = "bold 10.5px " + MONO;
+      ctx.fillStyle = d >= 0 ? UPC : DNC;
+      ctx.fillText((d >= 0 ? "+" : "−") + fmtV(Math.abs(d)), mid, h - footH + 11);
+      ctx.font = "10px " + MONO; ctx.fillStyle = "#8e8e8e";
+      ctx.fillText(fmtV(c.b + c.s), mid, h - footH + 27);
+    });
+    ctx.fillStyle = "#252525"; ctx.fillRect(0, h - footH - 2, w, 1);
+  }
+
+  function sessionStart(t) {
+    // futures trading day starts 18:00 New York
+    const p = P(NY, new Date(t));
+    const d = p.mins >= 1080 ? new Date(t) : new Date(t - 86400000);
+    const q = P(NY, d);
+    return zonedUtc(q.y + "-" + pad(q.mo) + "-" + pad(q.d), 1080, NY);
+  }
+  function profileData() {
+    let from, to;
+    const tf = F.tf * 60000;
+    if (F.pr === "day") { from = sessionStart(anchorT()); to = anchorT() + 60000; }
+    else { to = Math.floor(anchorT() / tf) * tf + tf; from = to - F.win * 60000; }
+    const lv = new Map();
+    let b = 0, s = 0, lo = Infinity, hi = -Infinity;
+    F.c.forEach((c, mt) => {
+      if (mt < from || mt >= to) return;
+      b += c.b; s += c.s;
+      c.lv.forEach((a, k) => {
+        const y = lv.get(k);
+        if (y) { y[0] += a[0]; y[1] += a[1]; } else lv.set(k, [a[0], a[1]]);
+        if (k < lo) lo = k; if (k > hi) hi = k;
+      });
+    });
+    return { lv, b, s, lo, hi, from, to };
+  }
+  let PROF = null;
+  function drawProfile() {
+    const { ctx, w, h } = canvasCtx("vpCanvas", FH);
+    PROF = null;
+    if (!F.src || F.blocked) return;
+    const pd = profileData();
+    const msg = document.getElementById("vpMsg");
+    if (!pd.lv.size) { msg.innerHTML = waitText(); msg.classList.add("on"); return; }
+    msg.classList.remove("on");
+    const labW = 92, top = 24, bot = 8, plotH = h - top - bot;
+    const st = pickTicks(pd.hi - pd.lo, Math.min(90, Math.floor(plotH / 4)));
+    const r0 = Math.floor(pd.lo / st), r1 = Math.floor(pd.hi / st), nR = r1 - r0 + 1;
+    const rh = Math.min(16, plotH / nR), y0 = top + (plotH - rh * nR) / 2;
+    const yOf = r => y0 + (r1 - r) * rh;
+    const rows = new Map();
+    let tot = 0;
+    pd.lv.forEach((a, k) => { const r = Math.floor(k / st); const y = rows.get(r); if (y) { y[0] += a[0]; y[1] += a[1]; } else rows.set(r, [a[0], a[1]]); tot += a[0] + a[1]; });
+    let poc = r0, pv = -1;
+    rows.forEach((a, r) => { if (a[0] + a[1] > pv) { pv = a[0] + a[1]; poc = r; } });
+    // value area: grow from POC towards the heavier side until 70%
+    let vaL = poc, vaH = poc, acc = pv;
+    const vol = r => { const a = rows.get(r); return a ? a[0] + a[1] : 0; };
+    while (acc < tot * 0.7 && (vaL > r0 || vaH < r1)) {
+      const up = vaH < r1 ? vol(vaH + 1) : -1, dn = vaL > r0 ? vol(vaL - 1) : -1;
+      if (up >= dn) { vaH++; acc += up; } else { vaL--; acc += dn; }
+    }
+    const barW = w - labW - 8;
+    for (let r = r0; r <= r1; r++) {
+      const a = rows.get(r);
+      if (!a) continue;
+      const v = a[0] + a[1], len = Math.max(1, v / pv * barW), y = yOf(r);
+      const inVA = r >= vaL && r <= vaH;
+      ctx.globalAlpha = inVA ? 0.95 : 0.4;
+      const hh = Math.max(1, rh - (rh > 4 ? 1 : 0));
+      const lb = len * a[0] / v;
+      ctx.fillStyle = "#2fbf72"; ctx.fillRect(4, y, lb, hh);
+      ctx.fillStyle = "#e04848"; ctx.fillRect(4 + lb, y, len - lb, hh);
+      ctx.globalAlpha = 1;
+      if (r === poc) { ctx.strokeStyle = AMB; ctx.lineWidth = 1.5; ctx.strokeRect(3, y - 0.5, len + 2, hh + 1); }
+    }
+    const pTop = r => ((r + 1) * st * F.base), pBot = r => (r * st * F.base), pMid = r => ((r + 0.5) * st * F.base);
+    const dec = Math.max(decOf(st), F.base < 0.1 ? 2 : 1);
+    const lines = [
+      { y: yOf(vaH), c: AMB, t: "VAH " + pTop(vaH).toFixed(dec), dash: true },
+      { y: yOf(poc) + rh / 2, c: AMB, t: "POC " + pMid(poc).toFixed(dec), dash: false },
+      { y: yOf(vaL) + rh, c: AMB, t: "VAL " + pBot(vaL).toFixed(dec), dash: true }
+    ];
+    if (F.last) {
+      const lr = Math.round(F.last / F.base) / st;
+      lines.push({ y: y0 + (r1 + 1 - lr) * rh, c: BLU, t: "NOW " + F.last.toFixed(Math.max(dec, 2)), dash: false });
+    }
+    lines.forEach(L => {
+      ctx.strokeStyle = L.c; ctx.lineWidth = 1; ctx.setLineDash(L.dash ? [4, 3] : []);
+      ctx.beginPath(); ctx.moveTo(4, Math.round(L.y) + 0.5); ctx.lineTo(w - labW + 2, Math.round(L.y) + 0.5); ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    // labels, nudged apart
+    const lab = lines.slice().sort((a, b) => a.y - b.y);
+    for (let i = 1; i < lab.length; i++) if (lab[i].y - lab[i - 1].y < 13) lab[i].y = lab[i - 1].y + 13;
+    const over = lab.length ? lab[lab.length - 1].y - (h - 8) : 0;
+    if (over > 0) lab.forEach(L => { L.y -= over; });
+    ctx.font = "bold 10px " + MONO; ctx.textAlign = "left";
+    lab.forEach(L => { ctx.fillStyle = L.c; ctx.fillText(L.t, w - labW + 6, Math.max(top - 6, Math.min(h - 8, L.y))); });
+    // title
+    ctx.font = "10px " + MONO; ctx.fillStyle = "#8e8e8e";
+    const span = F.pr === "day" ? "today since " + clockIST(pd.from) + " IST" : "last " + (F.win >= 60 ? F.win / 60 + "H" : F.win + "M") + " to " + clockIST(Math.min(pd.to, anchorT())) + " IST";
+    ctx.fillText("Volume by price · " + span, 4, 10);
+    PROF = { poc: pMid(poc), vah: pTop(vaH), val: pBot(vaL), b: pd.b, s: pd.s, dec };
+  }
+
+  function renderLevels() {
+    const box = document.getElementById("vpLevels");
+    if (!F.src || !PROF) { box.innerHTML = ""; return; }
+    const ratio = store.get("ratio." + F.src.k, 0);
+    const cv = p => ratio ? (p * ratio).toFixed(F.src.cdp) : "—";
+    const row = (k, p, note) => '<span class="lk">' + k + '</span><span class="lv">' + p.toFixed(PROF.dec) + (note ? ' <small style="color:var(--dim)">' + note + '</small>' : "") + '</span><span class="lc">' + cv(p) + '</span>';
+    const d = PROF.b - PROF.s;
+    box.innerHTML = '<span class="lk lh">LEVEL</span><span class="lv lh">' + F.src.sym + ' price</span><span class="lc lh">YOUR CHART</span>' +
+      row("VAH", PROF.vah, "top of 70% zone") + row("POC", PROF.poc, "most traded") + row("VAL", PROF.val, "bottom of 70% zone") +
+      (F.last ? row("NOW", F.last, "") : "") +
+      '<span class="lk">Δ</span><span class="lv" style="grid-column:2/-1;color:' + (d >= 0 ? "var(--up)" : "var(--down)") + '">' +
+      (d >= 0 ? "+" : "−") + fmtV(Math.abs(d)) + ' <small style="color:var(--dim)">buyers − sellers over this range' + (F.src.type === "ap" ? " (estimated)" : "") + '</small></span>' +
+      (ratio ? (F.src.type === "ap" && AP.feed !== "iex" ? '<span class="lh" style="grid-column:1/-1">Delayed feed: converted levels can be off by the last 15 minutes\' move — re-convert when the US market is quiet.</span>' : "")
+        : '<span class="lh" style="grid-column:1/-1">Type your chart\'s current ' + selM().label + ' price below and press Convert to see these levels on your chart.</span>');
+  }
+
+  function flowStatus() {
+    const el = document.getElementById("flowStatus"), s = F.src;
+    if (!s) { el.innerHTML = '<span class="bad">●</span> No free order-flow data for ' + selM().label; return; }
+    const delayed = s.type === "ap" && AP.feed !== "iex";
+    let st;
+    if (F.conn === "live") st = delayed ? '<span class="wait">● 15-MIN DELAYED</span>' : '<span class="ok">● LIVE</span>';
+    else if (F.conn === "retry") st = '<span class="bad">● RECONNECTING</span>';
+    else if (F.conn === "error") st = '<span class="bad">● ' + F.err + '</span>';
+    else if (F.conn === "wait") st = '<span class="wait">◌ CONNECTING</span>';
+    else st = '<span class="wait">● SETUP NEEDED</span>';
+    const parts = [st, "<b>" + s.name + "</b>"];
+    parts.push(s.type === "bn" ? "real buyer/seller side" : (AP.feed === "iex" ? "IEX exchange only · side estimated" : "full US market · side estimated"));
+    if (F.n) parts.push(F.n.toLocaleString("en-US") + " trades");
+    if (F.hist === "loading") parts.push("loading history…");
+    else if (F.hist === "none" && F.conn === "live") parts.push("history unavailable — building from live trades");
+    if (F.lastT) {
+      const ago = (Date.now() - F.lastT) / 60000, lim = delayed ? 30 : 10;
+      if (ago > lim) parts.push('<span class="wait">last trade ' + clockIST(F.lastT) + ' IST' + (s.type === "ap" ? " — US market closed, showing the last session" : "") + '</span>');
+    }
+    el.innerHTML = parts.join(" · ");
+  }
+
+  function drawFlow() {
+    F.dirty = false; F.drawn = Date.now();
+    try { drawFootprint(); drawProfile(); renderLevels(); } catch (e) { console.error(e); }
+    flowStatus();
+  }
+  setInterval(() => {
+    if (document.hidden) return;
+    if (F.dirty || Date.now() - F.drawn > 5000) drawFlow();
+  }, 400);
+  setInterval(() => { // keep about a day of 1-minute data
+    const cut = Date.now() - 26 * 3600000;
+    F.c.forEach((c, mt) => { if (mt < cut) F.c.delete(mt); });
+  }, 60000);
+  let rsT = 0;
+  window.addEventListener("resize", () => { clearTimeout(rsT); rsT = setTimeout(drawFlow, 150); });
+
+  function initFlowControls() {
+    tabs("flowTf", [["1", "1m"], ["5", "5m"], ["15", "15m"]], String(F.tf), v => { F.tf = +v; store.set("flowTf", F.tf); if (F.win < F.tf * 2) F.win = F.tf * 4; drawFlow(); });
+    tabs("flowWin", [["30", "30M"], ["60", "1H"], ["240", "4H"]], String(F.win), v => { F.win = +v; store.set("flowWin", F.win); drawFlow(); });
+    tabs("flowPr", [["win", "RANGE"], ["day", "TODAY"]], F.pr, v => { F.pr = v; store.set("flowPr", v); drawFlow(); });
+    tabs("apFeed", [["delayed_sip", "FULL MARKET · 15-MIN DELAY"], ["iex", "LIVE · IEX ONLY"]], AP.feed, v => {
+      AP.feed = v; store.set("apFeed", v); AP.fatal = false;
+      if (F.src && F.src.type === "ap") { apClose(); flowStart(); }
+    });
+    const k = apKeys();
+    document.getElementById("apKey").value = k.k;
+    document.getElementById("apSec").placeholder = k.s ? "saved" : "";
+    document.getElementById("apSave").addEventListener("click", () => {
+      const kv = document.getElementById("apKey").value.trim(), sv = document.getElementById("apSec").value.trim();
+      if (!kv || (!sv && !apKeys().s)) { document.getElementById("apKey").focus(); return; }
+      store.set("apKey", kv); if (sv) store.set("apSec", sv);
+      document.getElementById("apSec").value = ""; document.getElementById("apSec").placeholder = "saved";
+      AP.fatal = false; apClose();
+      const m = selM(), ap = (FLOW[m.id] || []).find(s => s.type === "ap");
+      if (ap) { F.pick[m.id] = ap.k; store.set("flowSrc", F.pick); }
+      flowStart();
+      document.getElementById("flowKeys").open = false;
+    });
+    document.getElementById("apClear").addEventListener("click", () => {
+      try { localStorage.removeItem("dtt.apKey"); localStorage.removeItem("dtt.apSec"); } catch (e) {}
+      document.getElementById("apKey").value = ""; document.getElementById("apSec").value = ""; document.getElementById("apSec").placeholder = "";
+      apClose(); flowStart();
+    });
+    document.getElementById("cfdSet").addEventListener("click", () => {
+      const v = parseFloat(document.getElementById("cfdNow").value);
+      if (!F.src || !F.last || !(v > 0)) return;
+      store.set("ratio." + F.src.k, v / F.last);
+      renderLevels();
+    });
+  }
+
+  /* ---------- release numbers: actual · forecast · previous ---------- */
+  const FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
+  const WCC = { USD: 1, EUR: 1, GBP: 1, CNY: 1 };
+  const RSKIP = /speaks|speech|minutes|statement|press conference|testif|election|holiday|crude oil|natural gas|auction|report$|summary|projections/i;
+  // [currency, title pattern, impact card, direction (+1 higher = stronger/tougher, -1 higher = weaker)]
+  const RMAP = [
+    ["USD", /unemployment rate/i, "nfp", -1],
+    ["USD", /claims/i, "usother", -1],
+    ["USD", /adp/i, "usother", 1],
+    ["USD", /non-farm|average hourly/i, "nfp", 1],
+    ["USD", /federal funds|fed.*rate/i, "fomc", 1],
+    ["USD", /pce/i, "pce", 1],
+    ["USD", /\bcpi\b/i, "cpi", 1],
+    ["USD", /./, "usother", 1],
+    ["EUR", /refinancing|deposit facility|ecb.*rate/i, "ecb", 1],
+    ["EUR", /\bcpi\b|hicp/i, "eucpi", 1],
+    ["EUR", /unemploy/i, null, -1],
+    ["GBP", /official bank rate/i, "boe", 1],
+    ["GBP", /\bcpi\b/i, "ukcpi", 1],
+    ["GBP", /claimant|unemploy/i, null, -1],
+    ["CNY", /./, "china", 1]
+  ];
+  const CC_OF = { [NYC]: "USD", [FRA]: "EUR", [LDN]: "GBP" };
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  let REL = [], relSrcText = "";
+  const relUser = () => store.get("rv", {});
+
+  function parseVal(s) {
+    s = String(s == null ? "" : s).trim().replace(/,/g, "").replace(/−/g, "-");
+    if (!s) return null;
+    const m = s.match(/^[<>]?\s*([+-]?\d+(?:\.\d+)?)\s*(%|K|M|B|T)?$/i);
+    if (!m) return null;
+    return { v: parseFloat(m[1]), u: (m[2] || "").toUpperCase(), dec: (m[1].split(".")[1] || "").length };
+  }
+  function tolOf(f, card) {
+    if (card === "fomc" || card === "ecb" || card === "boe") return 0.0001;
+    if (f.u === "%") return f.dec >= 2 ? 0.02 : 0.04;
+    if (f.u === "K") return Math.max(10, Math.abs(f.v) * 0.1);
+    if (f.u) return Math.max(Math.abs(f.v) * 0.03, Math.pow(10, -f.dec) / 2);
+    return Math.max(0.3, Math.pow(10, -f.dec) / 2);
+  }
+  const fmtNum = (v, u, dec) => (Math.round(v * Math.pow(10, dec)) / Math.pow(10, dec)).toFixed(dec) + u;
+  function judge(r) {
+    const f = parseVal(r.forecast), p = parseVal(r.previous);
+    const base = f || p;
+    if (!base) return null;
+    const res = { base, isF: !!f, tol: tolOf(base, r.card) };
+    let a = parseVal(r.actual);
+    if (a) {
+      if (!a.u && base.u) a.u = base.u;
+      const d = a.v - base.v;
+      res.a = a; res.d = d;
+      res.k = Math.abs(d) <= res.tol + 1e-9 ? "eq" : ((d > 0) === (r.dir > 0) ? "hi" : "lo");
+      res.big = res.k !== "eq" && Math.abs(d) > 3 * res.tol;
+      res.score = Math.abs(d) / Math.max(res.tol, 1e-6);
+    }
+    return res;
+  }
+  const evById = id => EVENTS.find(e => e.id === id);
+  function scenario(r, k) {
+    const ev = r.card ? evById(r.card) : null;
+    const row = ev ? ev.rows.find(x => x[0] === k) : null;
+    const generic = { hi: "Stronger than forecast", eq: "Close to forecast", lo: "Weaker than forecast" };
+    return { label: row ? row[1] : generic[k], cells: row ? row[2] : null };
+  }
+  const chipsHtml = cells => cells ? '<span class="mch">' + cells.map((c, i) => '<span><i>' + MKT[i] + '</i> <span class="' + (c === "n" ? "n0" : c) + '">' + SYMS[c] + '</span></span>').join("") + '</span>' : "";
+  const KCLS = { hi: "vh", lo: "vl", eq: "ve" };
+
+  function verdictHtml(r) {
+    const j = judge(r);
+    const more = r.card ? ' <a data-open="' + r.card + '">what it does ↓</a>' : "";
+    if (!j) {
+      if (r.actual) return "Out: <b>" + esc(r.actual) + "</b> — compare it with the forecast yourself." + more;
+      return (r.forecast ? "" : "No forecast yet — type one from the calendar above to get the thresholds.") + more;
+    }
+    const u = j.base.u, dec = j.base.dec;
+    const hiLab = scenario(r, r.dir > 0 ? "hi" : "lo"), loLab = scenario(r, r.dir > 0 ? "lo" : "hi");
+    const hiK = r.dir > 0 ? "hi" : "lo", loK = r.dir > 0 ? "lo" : "hi";
+    if (!j.a) {
+      const b = j.base.v, exact = j.tol < 0.001 || (u === "%" && dec <= 1 && j.tol < 0.05);
+      const what = j.isF ? "" : "No forecast — using the previous value. ";
+      if (exact)
+        return what + "Above <b>" + fmtNum(b, u, dec) + "</b> → <span class=\"" + KCLS[hiK] + "\">" + hiLab.label + "</span> · exactly " + fmtNum(b, u, dec) + " → as expected · below → <span class=\"" + KCLS[loK] + "\">" + loLab.label + "</span>" + more;
+      const dd = dec;
+      return what + "Above <b>" + fmtNum(b + j.tol, u, dd) + "</b> → <span class=\"" + KCLS[hiK] + "\">" + hiLab.label + "</span> · " +
+        fmtNum(b - j.tol, u, dd) + " to " + fmtNum(b + j.tol, u, dd) + " → about as expected · below <b>" + fmtNum(b - j.tol, u, dd) + "</b> → <span class=\"" + KCLS[loK] + "\">" + loLab.label + "</span>" + more;
+    }
+    const sc = scenario(r, j.k);
+    const diff = (j.d > 0 ? "+" : j.d < 0 ? "−" : "±") + fmtNum(Math.abs(j.d), u, Math.max(dec, j.a.dec));
+    const side = j.k === "eq" ? "in line with " : j.d > 0 ? "ABOVE " : "BELOW ";
+    return '<span class="' + KCLS[j.k] + '">' + (j.k === "eq" ? "= " : j.d > 0 ? "▲ " : "▼ ") + side + (j.isF ? "forecast" : "previous") + " (" + diff + ")</span> → <b>" + sc.label + (j.big ? " — big surprise" : "") + "</b> " + chipsHtml(sc.cells) + more;
+  }
+  function relTimeText(r, now) {
+    if (r.t > now) return "in " + dur((r.t - now) / 60000);
+    if (r.actual) return "released";
+    if (now - r.t < 3600000) return "OUT NOW — type the actual from the calendar above";
+    return "released — actual not entered";
+  }
+  function relRowHtml(r) {
+    const now = Date.now();
+    const ph = r.t > now ? "at " + clockIST(r.t) : "type it";
+    const fc = r.ffF ? esc(r.forecast) : '<input type="text" inputmode="decimal" data-rk="' + esc(r.key) + '" data-f="f" value="' + esc(r.forecast) + '" placeholder="type" aria-label="Forecast">';
+    return '<div class="rel" data-rk="' + esc(r.key) + '">' +
+      '<div class="rn"><span class="cc">' + r.cc + '</span>' + esc(r.title) + (r.imp === "High" ? '<span class="ih">HIGH</span>' : "") +
+      '<small>' + istStamp(r.t) + ' · <span class="rt"></span></small></div>' +
+      '<div class="rv a"><i>ACTUAL</i><input type="text" inputmode="decimal" data-rk="' + esc(r.key) + '" data-f="a" value="' + esc(r.actual) + '" placeholder="' + ph + '" aria-label="Actual"></div>' +
+      '<div class="rv f"><i>FORECAST</i>' + fc + '</div>' +
+      '<div class="rv p"><i>PREVIOUS</i>' + (esc(r.previous) || "—") + '</div>' +
+      '<div class="verdict"></div></div>';
+  }
+  function paintRel(key) {
+    const now = Date.now();
+    document.querySelectorAll(".rel[data-rk]").forEach(el => {
+      if (key && el.dataset.rk !== key) return;
+      const r = REL.find(x => x.key === el.dataset.rk);
+      if (!r) return;
+      const out = r.t <= now;
+      el.classList.toggle("live", out && !r.actual && now - r.t < 3600000);
+      el.classList.toggle("done", out && !!r.actual);
+      const rt = el.querySelector(".rt");
+      if (rt) rt.textContent = relTimeText(r, now);
+      el.querySelector(".verdict").innerHTML = verdictHtml(r);
+      el.querySelectorAll("input[data-rk]").forEach(inp => {
+        if (inp === document.activeElement) return;
+        const v = inp.dataset.f === "a" ? r.actual : r.forecast;
+        if (inp.value !== v) inp.value = v;
+      });
+    });
+    paintCards();
+  }
+  function cardRows(id) {
+    const now = Date.now();
+    return REL.filter(r => r.card === id && r.t > now - 4 * 86400000 && r.t < now + 8 * 86400000);
+  }
+  function paintCards() {
+    const now = Date.now();
+    EVENTS.forEach(ev => {
+      const rows = cardRows(ev.id);
+      const sum = document.getElementById("evf-" + ev.id);
+      const card = document.getElementById("ev-" + ev.id);
+      if (card) card.querySelectorAll(".sc").forEach(x => x.classList.remove("match"));
+      if (!rows.length) { if (sum) sum.innerHTML = ""; return; }
+      // latest release batch that has actuals → highlight the biggest surprise's scenario
+      const done = rows.filter(r => r.actual && r.t <= now && judge(r) && judge(r).k);
+      if (done.length) {
+        const lastT = Math.max(...done.map(r => r.t));
+        const batch = done.filter(r => r.t === lastT).map(r => ({ r, j: judge(r) })).sort((a, b) => b.j.score - a.j.score);
+        const top = batch[0];
+        if (card) { const sc = card.querySelector('.sc[data-k="' + top.j.k + '"]'); if (sc) sc.classList.add("match"); }
+        if (sum && now - lastT < 2 * 86400000) {
+          sum.innerHTML = '<br>Latest: <b>' + esc(top.r.title) + ' ' + esc(fmtNum(top.j.a.v, top.j.a.u, top.j.a.dec)) + '</b> vs ' + esc(top.r.forecast || top.r.previous) +
+            ' → <span class="' + KCLS[top.j.k] + '">' + scenario(top.r, top.j.k).label + '</span>';
+          return;
+        }
+      }
+      const nxt = rows.filter(r => r.t > now - 3600000)
+        .sort((a, b) => a.t - b.t || (!!parseVal(b.forecast) - !!parseVal(a.forecast)) || ((b.imp === "High") - (a.imp === "High")))[0];
+      if (sum) sum.innerHTML = nxt ? '<br>' + esc(nxt.title) + ': forecast <b>' + (esc(nxt.forecast) || "—") + '</b> · previous ' + (esc(nxt.previous) || "—") : "";
+    });
+  }
+  function renderRel() {
+    const tb = document.getElementById("relTable");
+    if (tb.contains(document.activeElement) || document.getElementById("evCards").contains(document.activeElement) && document.activeElement.matches("input")) {
+      setTimeout(renderRel, 3000); return;
+    }
+    const now = Date.now();
+    const list = REL.filter(r => r.t > now - 3 * 86400000).sort((a, b) => a.t - b.t);
+    let html = "", day = "";
+    list.forEach(r => {
+      const p = P(IST, new Date(r.t)), d = WDN[p.wd] + " " + p.d + " " + MON[p.mo - 1];
+      if (d !== day) { day = d; html += '<div class="relday">' + d.toUpperCase() + ' (IST)</div>'; }
+      html += relRowHtml(r);
+    });
+    tb.innerHTML = html || '<div class="relempty">No high or medium-impact releases for your markets left this week.</div>';
+    EVENTS.forEach(ev => {
+      const box = document.getElementById("evv-" + ev.id);
+      if (box) box.innerHTML = cardRows(ev.id).sort((a, b) => a.t - b.t).map(relRowHtml).join("");
+    });
+    document.getElementById("relSrc").innerHTML = relSrcText;
+    paintRel();
+  }
+  function applyUser(rows) {
+    const U = relUser();
+    rows.forEach(r => { const u = U[r.key] || {}; r.actual = u.a || ""; if (!r.ffF) r.forecast = u.f || ""; });
+    return rows;
+  }
+  function relFromFF(data) {
+    const out = [];
+    data.forEach(e => {
+      if (!e || !WCC[e.country] || (e.impact !== "High" && e.impact !== "Medium")) return;
+      if (!e.forecast && !e.previous) return;
+      if (RSKIP.test(e.title || "")) return;
+      const t = Date.parse(e.date);
+      if (!t) return;
+      const mp = RMAP.find(([c, re]) => c === e.country && re.test(e.title));
+      out.push({ key: e.country + "|" + e.title + "|" + e.date, cc: e.country, title: e.title, t, imp: e.impact,
+        card: mp ? mp[2] : null, dir: mp ? mp[3] : 1, forecast: e.forecast || "", previous: e.previous || "", ffF: !!e.forecast });
+    });
+    return applyUser(out);
+  }
+  function relFallback() {
+    const now = Date.now(), out = [];
+    EVENTS.forEach(ev => {
+      if (!ev.dates || ev.imp === "un2") return;
+      ev.dates.forEach(ds => {
+        const t = zonedUtc(ds, ev.t, ev.tz);
+        if (t > now - 3 * 86400000 && t < now + 7 * 86400000)
+          out.push({ key: "SCH|" + ev.id + "|" + ds, cc: CC_OF[ev.tz] || "USD", title: ev.name, t, imp: ev.imp === "hi" ? "High" : "Medium",
+            card: ev.id, dir: 1, forecast: "", previous: "", ffF: false });
+      });
+    });
+    return applyUser(out);
+  }
+  const ffStamp = t => { const p = P(IST, new Date(t)); return p.d + " " + MON[p.mo - 1] + " " + pad(p.h) + ":" + pad(p.mi) + " IST"; };
+  const ffValid = d => Array.isArray(d) && d.length > 0 && d.some(e => e && e.title && e.country && e.date);
+  const ffStale = d => { const mx = Math.max(...d.map(e => Date.parse(e.date) || 0)); return mx < Date.now(); };
+  function ffJsonp(url, ms) {
+    return new Promise((res, rej) => {
+      const cb = "__ffcb" + Date.now(), sc = document.createElement("script");
+      let tm;
+      const done = (v, err) => { clearTimeout(tm); try { delete window[cb]; } catch (x) { window[cb] = undefined; } sc.remove(); err ? rej(err) : res(v); };
+      tm = setTimeout(() => done(null, new Error("timeout")), ms || 20000);
+      window[cb] = d => done(d);
+      sc.onerror = () => done(null, new Error("script error"));
+      sc.src = url + (url.indexOf("?") >= 0 ? "&" : "?") + "callback=" + cb;
+      document.head.appendChild(sc);
+    });
+  }
+  async function ffGet(url) {
+    const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const tm = setTimeout(() => ctl && ctl.abort(), 20000);
+    try {
+      const r = await fetch(url, { cache: "no-store", signal: ctl ? ctl.signal : undefined });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return JSON.parse(await r.text());
+    } finally { clearTimeout(tm); }
+  }
+  function ffUse(data, src, at) {
+    const keep = data.filter(e => e && WCC[e.country]);
+    store.set("ffc", { at, data: keep, src });
+    REL = relFromFF(keep);
+    relSrcText = ffLabel(src) + ffStamp(at);
+  }
+  const ffLabel = src => src === "paste" ? "Forex Factory · pasted " : src === "relay" ? "Forex Factory (your relay) · checked " : "Forex Factory · checked ";
+  const FIX_LINK = ' <a data-fix="1">Fix ↓</a>';
+  let ffBusy = false;
+  async function loadFF(force) {
+    if (ffBusy) return;
+    const c = store.get("ffc", null);
+    const usable = c && c.data && ffValid(c.data) && !ffStale(c.data);
+    if (usable && !REL.length) {
+      REL = relFromFF(c.data);
+      relSrcText = ffLabel(c.src) + ffStamp(c.at);
+      renderRel();
+    }
+    if (!force && usable && Date.now() - c.at < 3600000) return;
+    ffBusy = true;
+    const relay = store.get("ffRelay", "");
+    let data = null, src = "";
+    if (relay) {
+      try { data = await ffGet(relay); } catch (e) { data = null; }
+      if (!ffValid(data)) { try { data = await ffJsonp(relay); } catch (e) { data = null; } }
+      if (ffValid(data)) src = "relay";
+    }
+    if (!src) {
+      try { data = await ffGet(FF_URL); if (ffValid(data)) src = "ff"; } catch (e) { data = null; }
+    }
+    ffBusy = false;
+    if (src) { ffUse(data, src, Date.now()); if (!force) document.getElementById("ffKeys").open = false; }
+    else if (usable) {
+      REL = relFromFF(c.data);
+      relSrcText = (c.src === "paste" ? "Forex Factory · pasted " : "Forex Factory copy from ") + ffStamp(c.at) +
+        (c.src === "paste" ? "" : (relay ? " (your relay didn't answer — retrying hourly)" : " (couldn't refresh)") + FIX_LINK);
+    } else {
+      REL = relFallback();
+      relSrcText = (relay ? "Your relay didn't send the forecasts — check its URL." : "Forecasts not loaded: Chrome blocks pages from reading Forex Factory's feed directly.") + FIX_LINK;
+      document.getElementById("ffKeys").open = true;
+    }
+    renderRel();
+    return src;
+  }
+  function initFF() {
+    const relayIn = document.getElementById("ffRelay"), msg = document.getElementById("ffMsg");
+    relayIn.value = store.get("ffRelay", "");
+    const say = (t, ok) => { msg.textContent = t; msg.className = "note " + (ok ? "ok" : "bad"); };
+    document.getElementById("gasCopy").addEventListener("click", async () => {
+      const txt = document.getElementById("gasCode").textContent;
+      let ok = false;
+      try { await navigator.clipboard.writeText(txt); ok = true; } catch (e) {}
+      if (!ok) {
+        const r = document.createRange(); r.selectNodeContents(document.getElementById("gasCode"));
+        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        try { ok = document.execCommand("copy"); } catch (e) {}
+      }
+      say(ok ? "Code copied — paste it into the Apps Script editor." : "Select the code above and copy it by hand.", ok);
+    });
+    document.getElementById("ffRelaySave").addEventListener("click", async () => {
+      const u = relayIn.value.trim();
+      if (!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(u)) { say("That doesn't look like an Apps Script web app URL — it should start with https://script.google.com/macros/s/ and end in /exec.", false); return; }
+      store.set("ffRelay", u);
+      say("Checking your relay…", true);
+      const src = await loadFF(true);
+      if (src === "relay") say("Working — forecasts now load by themselves, checked once an hour.", true);
+      else say("Your relay didn't answer with the forecasts. Check that the deployment is set to 'Anyone' and that you copied the /exec URL.", false);
+    });
+    document.getElementById("ffRelayClear").addEventListener("click", () => {
+      try { localStorage.removeItem("dtt.ffRelay"); } catch (e) {}
+      relayIn.value = ""; say("Relay removed.", true);
+    });
+    document.getElementById("ffPasteLoad").addEventListener("click", () => {
+      const box = document.getElementById("ffPaste");
+      let data = null;
+      try { data = JSON.parse(box.value.trim()); } catch (e) {}
+      if (!ffValid(data)) { say("That isn't the Forex Factory feed — copy the whole page from the link in step 1 and try again.", false); return; }
+      ffUse(data, "paste", Date.now());
+      box.value = "";
+      renderRel();
+      say(ffStale(data) ? "Loaded, but that feed is from a past week — Forex Factory posts the new week on Sunday." : "Loaded " + REL.length + " releases for your markets.", !ffStale(data));
+    });
+    document.getElementById("relSrc").addEventListener("click", e => {
+      if (!e.target.closest("a[data-fix]")) return;
+      const k = document.getElementById("ffKeys");
+      k.open = true; k.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+  function relInput(e) {
+    const inp = e.target.closest("input[data-rk]");
+    if (!inp) return;
+    const key = inp.dataset.rk, f = inp.dataset.f, v = inp.value.trim();
+    const U = relUser(); U[key] = U[key] || {}; U[key][f] = v;
+    // forget entries older than three weeks
+    const cut = Date.now() - 21 * 86400000;
+    Object.keys(U).forEach(k => { const d = Date.parse(k.split("|").pop()); if (d && d < cut) delete U[k]; });
+    store.set("rv", U);
+    const r = REL.find(x => x.key === key);
+    if (r) { if (f === "a") r.actual = v; else r.forecast = v; }
+    paintRel(key);
+    document.querySelectorAll('input[data-rk]').forEach(x => { if (x !== inp && x.dataset.rk === key && x.dataset.f === f) x.value = v; });
+  }
+  function relClick(e) {
+    const a = e.target.closest("a[data-open]");
+    if (!a) return;
+    e.preventDefault();
+    const card = document.getElementById("ev-" + a.dataset.open);
+    if (!card) return;
+    card.open = true;
+    card.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  ["relTable", "evCards"].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener("input", relInput);
+    el.addEventListener("click", relClick);
+  });
+  function relForUpNext(ev, t) {
+    const r = REL.filter(x => x.card === ev.id && Math.abs(x.t - t) < 6 * 3600000).sort((a, b) => (b.imp === "High") - (a.imp === "High"))[0];
+    if (!r) return "";
+    return " · " + r.title + ": " + (r.actual ? "actual " + r.actual + ", " : "") + "fcst " + (r.forecast || "—") + ", prev " + (r.previous || "—");
+  }
+
+  /* ---------- start ---------- */
+  buildTiles();
+  mini("mVix", "CAPITALCOM:VIX", "1D");
+  mini("mDxy", "CAPITALCOM:DXY", "1D");
+  mini("mYld", "TVC:US10Y", "1D");
+  tabs("tfTabs", TF, state.tf, v => { state.tf = v; store.set("tf", v); mountChart(); mountTa(); });
+  tabs("newsTabs", [["all", "ALL"], ["idx", "INDICES"], ["fx", "FX"], ["sel", "THIS MARKET"]], state.news, v => { state.news = v; store.set("news", v); mountNews(); });
+  tabs("calTabs", [["day", "DAY-TRADE"], ["all", "+ SWING"]], state.cal, v => { state.cal = v; store.set("cal", v); mountCal(); });
+  initFlowControls();
+  select(state.sel);
+  mountNews();
+  mountCal();
+
+  let swingLoaded = false;
+  document.getElementById("secSwing").addEventListener("toggle", e => {
+    if (e.target.open && !swingLoaded) {
+      swingLoaded = true;
+      mount("wSwing", "market-quotes", Object.assign({ width: "100%", height: "100%", symbolsGroups: SWING, showSymbolLogo: true }, DARK));
+    }
+  });
+
+  renderEvents(); renderVolume(); updateEvents(); initFF(); loadFF();
+  setInterval(() => loadFF(), 3600000);
+  calc(); renderLoss(); tick();
+  setInterval(tick, 1000);
+  setInterval(updateEvents, 15000);
+  setInterval(renderLoss, 60000);
+})();
+</script>
+<script>
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); });
+}
+</script>
+</body>
+</html>
