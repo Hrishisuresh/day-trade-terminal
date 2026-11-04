@@ -2299,7 +2299,7 @@ function text_(html) {
         if (ffValid(data)) { src = "relay"; relayVer = v; store.set("relayVer", v); }
       }
     }
-    if (!src) {
+    if (!src && !relay) {
       try { data = await ffGet(FF_URL); if (ffValid(data)) src = "ff"; } catch (e) { data = null; }
     }
     ffBusy = false;
@@ -2323,7 +2323,7 @@ function text_(html) {
     let wait = 3600000;
     if (store.get("ffRelay", "")) {
       REL.filter(isAuto).forEach(r => {
-        if (r.t <= now && !r.auto && now - r.t < 2 * 3600000) wait = Math.min(wait, now - r.t < 20 * 60000 ? 60000 : 180000);
+        if (r.t <= now && !r.auto && now - r.t < 2 * 3600000) wait = Math.min(wait, now - r.t < 30 * 60000 ? 180000 : 300000);
         else if (r.t > now && r.t - now < 3600000) wait = Math.min(wait, r.t - now + 20000);
       });
     }
