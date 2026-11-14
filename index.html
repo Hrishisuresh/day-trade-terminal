@@ -1969,6 +1969,8 @@ function text_(html) {
 
   /* ---------- release numbers: actual · forecast · previous ---------- */
   const FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
+  const DEFAULT_RELAY = "";   // built-in relay link: works on every device with nothing to paste
+  const getRelay = () => store.get("ffRelay", "") || DEFAULT_RELAY;
   const WCC = { USD: 1, EUR: 1, GBP: 1, CNY: 1 };
   const RSKIP = /speaks|speech|minutes|statement|press conference|testif|election|holiday|crude oil|natural gas|auction|report$|summary|projections|votes/i;
   // [currency, title pattern, impact card, direction (+1 higher = stronger/tougher, -1 higher = weaker)]
@@ -2100,7 +2102,7 @@ function text_(html) {
     if (r.t > now) return "in " + dur((r.t - now) / 60000);
     if (r.actual) return "released";
     const fresh = now - r.t < 3600000 ? "OUT NOW — " : "";
-    if (isAuto(r) && store.get("ffRelay", "")) return fresh + "fetching the official figure…";
+    if (isAuto(r) && getRelay()) return fresh + "fetching the official figure…";
     if (needsFred(r)) return fresh + "official figure needs the free FRED key (Settings)";
     return fresh + "no free official feed for this one";
   }
@@ -2231,7 +2233,7 @@ function text_(html) {
       const cb = "__ffcb" + Date.now(), sc = document.createElement("script");
       let tm;
       const done = (v, err) => { clearTimeout(tm); try { delete window[cb]; } catch (x) { window[cb] = undefined; } sc.remove(); err ? rej(err) : res(v); };
-      tm = setTimeout(() => done(null, new Error("timeout")), ms || 20000);
+      tm = setTimeout(() => done(null, new Error("timeout")), ms || 45000);
       window[cb] = d => done(d);
       sc.onerror = () => done(null, new Error("script error"));
       sc.src = url + (url.indexOf("?") >= 0 ? "&" : "?") + "callback=" + cb;
@@ -2240,7 +2242,7 @@ function text_(html) {
   }
   async function ffGet(url) {
     const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
-    const tm = setTimeout(() => ctl && ctl.abort(), 20000);
+    const tm = setTimeout(() => ctl && ctl.abort(), 45000);
     try {
       const r = await fetch(url, { cache: "no-store", signal: ctl ? ctl.signal : undefined });
       if (!r.ok) throw new Error("HTTP " + r.status);
@@ -2271,7 +2273,7 @@ function text_(html) {
     REL = relFromFF(keep);
     relSrcText = srcText(src, at);
   }
-  let ffBusy = false, pollT = 0;
+  let ffBusy = false, pollT = 0, relayFailed = false;
   async function loadFF(force) {
     if (ffBusy) return;
     const c = store.get("ffc", null);
@@ -2283,7 +2285,7 @@ function text_(html) {
     }
     if (!force && usable && Date.now() - c.at < 3600000) { planPoll(); return; }
     ffBusy = true;
-    const relay = store.get("ffRelay", "");
+    const relay = getRelay();
     let data = null, src = "", actuals = null;
     if (relay) {
       const url = relay + (relay.indexOf("?") >= 0 ? "&" : "?") + "v=2";
@@ -2303,13 +2305,14 @@ function text_(html) {
       try { data = await ffGet(FF_URL); if (ffValid(data)) src = "ff"; } catch (e) { data = null; }
     }
     ffBusy = false;
+    relayFailed = !!relay && src !== "relay";
     if (src) ffUse(data, src, Date.now(), actuals);
     else if (usable) {
       REL = relFromFF(c.data);
-      relSrcText = srcText(c.src, c.at) + (c.src === "paste" ? "" : " · couldn't refresh" + SETLINK("ffKeys", "check ↓"));
+      relSrcText = srcText(c.src, c.at) + (relay ? " · relay busy, retrying…" : " · couldn't refresh" + SETLINK("ffKeys", "check ↓"));
     } else {
       REL = relFallback();
-      relSrcText = "official schedule only — connect your relay for forecasts and actual figures" + SETLINK("ffKeys", "Settings ↓");
+      relSrcText = relay ? "relay is waking up — retrying in a minute…" : "official schedule only — connect your relay for forecasts and actual figures" + SETLINK("ffKeys", "Settings ↓");
     }
     renderRel();
     setState();
@@ -2321,7 +2324,8 @@ function text_(html) {
     clearTimeout(pollT);
     const now = Date.now();
     let wait = 3600000;
-    if (store.get("ffRelay", "")) {
+    if (relayFailed) wait = 90000;      // relay slow or asleep: try again soon, keep the link
+    if (getRelay()) {
       REL.filter(isAuto).forEach(r => {
         if (r.t <= now && !r.auto && now - r.t < 2 * 3600000) wait = Math.min(wait, now - r.t < 30 * 60000 ? 180000 : 300000);
         else if (r.t > now && r.t - now < 3600000) wait = Math.min(wait, r.t - now + 20000);
@@ -2331,7 +2335,7 @@ function text_(html) {
   }
   function setState() {
     const ffs = document.getElementById("ffState");
-    const relay = store.get("ffRelay", "");
+    const relay = getRelay();
     if (ffs) { ffs.textContent = relay ? (relayVer === 2 ? "· connected" : "· update code for actuals") : "· not set"; ffs.className = "kst" + (relay && relayVer === 2 ? " ok" : ""); }
   }
   function openSet(id) {
@@ -2346,7 +2350,7 @@ function text_(html) {
   });
   function initFF() {
     const relayIn = document.getElementById("ffRelay"), msg = document.getElementById("ffMsg");
-    relayIn.value = store.get("ffRelay", "");
+    relayIn.value = getRelay();
     const say = (t, ok) => { msg.textContent = t; msg.className = "note " + (ok ? "ok" : "bad"); };
     document.getElementById("gasCopy").addEventListener("click", async () => {
       const txt = document.getElementById("gasCode").textContent;
@@ -2370,7 +2374,7 @@ function text_(html) {
     });
     document.getElementById("ffRelayClear").addEventListener("click", () => {
       try { localStorage.removeItem("dtt.ffRelay"); } catch (e) {}
-      relayIn.value = ""; say("Relay removed.", true); setState();
+      relayIn.value = DEFAULT_RELAY; say(DEFAULT_RELAY ? "Back to the built-in relay link." : "Relay removed.", true); setState();
     });
     setState();
   }
