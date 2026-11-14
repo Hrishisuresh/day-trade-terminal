@@ -1969,7 +1969,7 @@ function text_(html) {
 
   /* ---------- release numbers: actual · forecast · previous ---------- */
   const FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
-  const DEFAULT_RELAY = "";   // built-in relay link: works on every device with nothing to paste
+  const DEFAULT_RELAY = "https://script.google.com/macros/s/AKfycbxUIBXzqV4DEkils_WHRaFZpvd287XnHTjMxGXqqVq12DnIbd8hgWsJwB0T422JSOZbeQ/exec";   // built-in relay link: works on every device with nothing to paste
   const getRelay = () => store.get("ffRelay", "") || DEFAULT_RELAY;
   const WCC = { USD: 1, EUR: 1, GBP: 1, CNY: 1 };
   const RSKIP = /speaks|speech|minutes|statement|press conference|testif|election|holiday|crude oil|natural gas|auction|report$|summary|projections|votes/i;
