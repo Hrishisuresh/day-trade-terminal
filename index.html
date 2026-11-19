@@ -291,6 +291,41 @@
   .stopmsg.one { color: var(--amber); }
   .stopmsg.bad { color: #000; background: var(--down); padding: 4px 6px; }
 
+  /* ---------- advisors ---------- */
+  .advstat { padding: 6px 10px; font-size: 11px; color: var(--dim); border-bottom: 1px solid var(--line); line-height: 1.5; }
+  .advstat b { color: var(--muted); font-weight: 600; }
+  .arow { border-bottom: 1px solid var(--line); }
+  .arow > button { display: grid; grid-template-columns: 66px 70px minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; background: transparent; border: 0; color: var(--white); padding: 8px 10px; text-align: left; cursor: pointer; font: inherit; }
+  .arow.stale > button { opacity: .5; }
+  .an { font-weight: 700; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .av { font-size: 10.5px; font-weight: 700; padding: 2px 0; text-align: center; border: 1px solid #333; color: var(--dim); letter-spacing: .03em; }
+  .av.take { background: var(--up); color: #000; border-color: var(--up); }
+  .av.watch { color: var(--amber); border-color: var(--amber); }
+  .av.skip { color: var(--down); border-color: #5a2323; }
+  .al { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .al b { color: var(--white); font-weight: 600; }
+  .ac { font-size: 11px; color: var(--muted); text-align: right; }
+  .adet { display: none; padding: 0 10px 10px; }
+  .arow.open .adet { display: block; }
+  .arow.open > button { background: #120e05; }
+  .alv { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px 8px; font-size: 11px; color: var(--dim); padding: 8px 0 2px; }
+  .alv b { color: var(--white); font-size: 12.5px; font-weight: 600; }
+  .az { font-size: 11px; color: var(--amber); padding: 2px 0 6px; }
+  .aline { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-top: 1px solid #1a1a1a; font-size: 12px; line-height: 1.45; }
+  .aline .k { color: var(--amber); font-size: 11px; font-weight: 600; }
+  .aline .k small { display: block; color: var(--dim); font-weight: 400; font-size: 10.5px; }
+  .aline .t { color: var(--white); min-width: 0; overflow-wrap: anywhere; }
+  .aline .t i { display: block; color: var(--dim); font-style: normal; font-size: 11px; margin-top: 2px; }
+  .asrc { font-size: 10.5px; color: var(--dim); padding-top: 6px; border-top: 1px solid #1a1a1a; }
+  .pst { padding: 7px 10px; font-size: 11.5px; color: var(--muted); border-bottom: 1px solid var(--line); line-height: 1.5; }
+  .pst b { color: var(--amber); font-weight: 600; margin-right: 4px; }
+  .ptr { display: grid; grid-template-columns: 66px minmax(0, 1fr) auto; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
+  .ptr b { color: var(--white); }
+  .ptr .up, .ptr .dn { font-weight: 700; }
+  .phd { padding: 6px 10px 4px; font-size: 10.5px; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--line); }
+  .advfoot { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 7px 10px; font-size: 11px; color: var(--dim); }
+  .advfoot a { color: var(--blue); text-decoration: none; }
+
   footer { padding: 10px 12px 26px; color: var(--dim); font-size: 11px; line-height: 1.6; }
 
   @media (min-width: 700px) {
@@ -301,7 +336,7 @@
   }
   @media (min-width: 1100px) {
     .wrap { grid-template-columns: repeat(12, minmax(0, 1fr)); }
-    .s-tiles, .s-mood, .s-guide, .s-flow, .s-set { grid-column: 1 / -1; }
+    .s-tiles, .s-adv, .s-mood, .s-guide, .s-flow, .s-set { grid-column: 1 / -1; }
     .flowgrid { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); }
     .vpwrap { border-top: 0; border-left: 1px solid var(--line); }
     .howto { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -339,6 +374,14 @@
   <section class="sec s-tiles" id="secTiles">
     <div class="shead"><h2>Day-trade markets</h2></div>
     <div class="tiles" id="tiles"></div>
+  </section>
+
+  <!-- 1b. Advisors -->
+  <section class="sec s-adv" id="secAdv">
+    <div class="shead"><h2>Advisors</h2><span class="hint">paper only</span><div class="tabs" id="advTabs"></div></div>
+    <div class="advstat" id="advStat"></div>
+    <div id="advRows"><div class="relempty">Loading…</div></div>
+    <div class="advfoot" id="advFoot"></div>
   </section>
 
   <!-- 2. Market mood -->
@@ -471,20 +514,23 @@
       <details class="keys" id="ffKeys">
         <summary>Forecasts &amp; official actual numbers <span class="kst" id="ffState"></span></summary>
         <div class="kbody">
-          <div class="note">Your Google relay fetches Forex Factory's forecasts and the official actual figures (BLS, Federal Reserve, Bank of England, ECB, ONS, Eurostat) for the calendar. Add a free FRED key to the relay code to also get jobless claims, PCE, retail sales and GDP.</div>
+          <div class="note">Your Google relay fetches Forex Factory's forecasts and the official actual figures (BLS, Federal Reserve, Bank of England, ECB, ONS, Eurostat) for the calendar, and from version 3 it also runs the <b>Advisors</b>. Add a free FRED key to also get jobless claims, PCE, retail sales and GDP.</div>
           <div class="fld"><label for="ffRelay">Relay link (/exec)</label><input id="ffRelay" type="url" autocomplete="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></div>
           <div class="kbtns"><button type="button" id="ffRelaySave">Save &amp; load</button><button type="button" id="ffRelayClear" class="ghost">Remove</button></div>
           <div class="note" id="ffMsg"></div>
-          <details class="sub"><summary>Relay code (version 2) and how to update it</summary>
+          <details class="sub"><summary>Relay code (version 3) and how to update it</summary>
             <ol>
-              <li>Optional: paste a free FRED key between the quotes on the <b>FRED_KEY</b> line (get one at <a href="https://fredaccount.stlouisfed.org/apikeys" target="_blank" rel="noopener">fredaccount.stlouisfed.org</a>).</li>
-              <li>Press <b>Copy code</b>, open your project on <a href="https://script.google.com/home" target="_blank" rel="noopener">script.google.com</a>, select everything in Code.gs, paste over it and save.</li>
+              <li>Get two free keys: <b>Twelve Data</b> (<a href="https://twelvedata.com/account/api-keys" target="_blank" rel="noopener">twelvedata.com → API keys</a>) and <b>Gemini</b> (<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com → Get API key</a>, no billing needed).</li>
+              <li>Press <b>Copy code</b>, open your project on <a href="https://script.google.com/home" target="_blank" rel="noopener">script.google.com</a>, select everything in Code.gs and paste over it. Paste your keys between the quotes on the <b>TWELVE_KEY</b> and <b>GEMINI_KEY</b> lines, and your <b>FRED_KEY</b> again if you had one. Save.</li>
+              <li>In the menu next to <b>Run</b>, pick <b>setupAdvisors</b> and press <b>Run</b>. Allow access when Google asks (if it says the app isn't verified: Advanced → Go to project). The log shows your watchlist sheet link and whether both keys work. Do this once.</li>
               <li><b>Deploy → Manage deployments</b> → pencil icon → Version: <b>New version</b> → <b>Deploy</b>. Your link stays the same.</li>
               <li>New setup instead? <b>Deploy → New deployment</b> → Web app, Execute as <b>Me</b>, access <b>Anyone</b>, then paste the /exec link above.</li>
+              <li>After the free month: in AI Studio turn on billing and claim your Google AI Pro credits, set a spend cap, then change <b>AI_PLAN</b> from 'free' to 'paid' and repeat step 4.</li>
             </ol>
-            <pre id="gasCode">// Day-Trade Terminal relay v2
+            <pre id="gasCode">// Day-Trade Terminal relay v3
 // Gives the terminal Forex Factory's forecasts plus the official actual numbers,
 // read straight from the publishers: BLS, Federal Reserve, Bank of England, ECB and ONS.
+// Version 3 adds the Advisors (settings further down, under ADVISORS).
 //
 // Optional free keys (paste between the quotes):
 // FRED_KEY adds jobless claims, PCE inflation, retail sales and GDP
@@ -534,9 +580,11 @@ var RULES = [
 
 function doGet(e) {
   var p = (e &amp;&amp; e.parameter) || {};
-  var ffText = getFF_();
-  var body = ffText;
-  if (p.v === '2') {
+  var body;
+  if (p.adv === '1') body = advJson_();
+  else body = getFF_();
+  if (p.v === '2' &amp;&amp; p.adv !== '1') {
+    var ffText = body;
     var ff = [];
     try { ff = JSON.parse(ffText); } catch (x) {}
     var actuals = {};
@@ -849,6 +897,771 @@ function text_(html) {
     .replace(/\s*-?\s*½/g, '-1/2').replace(/\s*-?\s*¼/g, '-1/4').replace(/\s*-?\s*¾/g, '-3/4').replace(/&lt;script[\s\S]*?&lt;\/script&gt;/gi, ' ').replace(/&lt;style[\s\S]*?&lt;\/style&gt;/gi, ' ')
     .replace(/&lt;[^&gt;]+&gt;/g, ' ').replace(/&amp;nbsp;|&amp;#160;/g, ' ').replace(/&amp;amp;/g, '&amp;').replace(/&amp;#8211;|&amp;ndash;/g, '–')
     .replace(/\s+/g, ' ');
+}
+
+// ======================================================================
+// ADVISORS (relay version 3)
+// Four advisors look at every market on your watchlist every 15 minutes:
+//   Structure - your ICT read: higher-timeframe trend, liquidity sweep,
+//               break in structure, gap (FVG) entry
+//   Momentum  - trend, pace (RSI) and where price sits against its averages
+//   Risk      - your rules: at least 1:2, sensible stop, no high-impact news,
+//               two-loss daily stop
+//   Judge     - weighs the three by how often each has been right, then says
+//               TAKE / WATCH / WAIT / SKIP. Gemini writes the reasons when a
+//               setup is worth a look.
+// Every TAKE and WATCH call is paper-traded and graded automatically.
+// Nothing here places real orders.
+//
+// Paste your keys between the quotes, then run setupAdvisors once (see the
+// terminal's Settings for the steps).
+var TWELVE_KEY = '';   // twelvedata.com -&gt; API keys (free plan)
+var GEMINI_KEY = '';   // aistudio.google.com -&gt; Get API key (free)
+// 'free' for the first month. After that: turn on billing in AI Studio,
+// set a spend cap, then change 'free' to 'paid'.
+var AI_PLAN = 'free';
+
+var ADV_CFG = {
+  dayFromUTC: 6, dayToUTC: 21,   // day-trade scans Mon-Fri, 11:30-02:30 IST
+  rollUTC: 22,                   // a trading day starts at 22:00 UTC (New York 5 pm)
+  take: 70, watch: 55,           // the judge's bars
+  minRR: 2,
+  creditsPerTick: 7,             // Twelve Data free plan: 8 a minute, 800 a day
+  caps: { free: { judge: 18, helper: 450, backup: 2000 }, paid: { judge: 1500, helper: 3000, backup: 3000 } },
+  pendingHours: { day: 6, swing: 120 },
+  holdHours: { swing: 480 }
+};
+
+// On, Name, Mode, Data symbol, Backup symbol, News currencies
+var ADV_DEFAULT_LIST = [
+  [true, 'XAUUSD', 'Day', 'XAU/USD', 'GC=F', 'USD'],
+  [true, 'NAS100', 'Day', 'NQ=F', 'QQQ', 'USD'],
+  [true, 'US30', 'Day', 'YM=F', 'DIA', 'USD'],
+  [true, 'SPX500', 'Day', 'ES=F', 'SPY', 'USD'],
+  [true, 'GER40', 'Day', '^GDAXI', '', 'EUR'],
+  [true, 'UK100', 'Day', '^FTSE', '', 'GBP'],
+  [true, 'EURUSD', 'Swing', 'EUR/USD', '', 'EUR USD'],
+  [true, 'GBPUSD', 'Swing', 'GBP/USD', '', 'GBP USD'],
+  [true, 'USDJPY', 'Swing', 'USD/JPY', '', 'USD JPY'],
+  [true, 'AUDUSD', 'Swing', 'AUD/USD', '', 'AUD USD'],
+  [true, 'USDCAD', 'Swing', 'USD/CAD', '', 'USD CAD'],
+  [true, 'USDCHF', 'Swing', 'USD/CHF', '', 'USD CHF'],
+  [true, 'NZDUSD', 'Swing', 'NZD/USD', '', 'NZD USD'],
+  [true, 'EURJPY', 'Swing', 'EUR/JPY', '', 'EUR JPY'],
+  [true, 'GBPJPY', 'Swing', 'GBP/JPY', '', 'GBP JPY'],
+  [true, 'XAUUSD', 'Swing', 'XAU/USD', 'GC=F', 'USD']
+];
+var ADV_JOURNAL_HEAD = ['Closed (IST)', 'Market', 'Mode', 'Call', 'Direction', 'Entry', 'Stop', 'Target', 'Planned R:R',
+  'Result', 'R', 'Called (IST)', 'Filled (IST)', 'Structure', 'Momentum', 'Risk', 'Judge', 'Session', 'With trend', 'Data', 'Why'];
+
+// ---------- run once from the editor ----------
+function setupAdvisors() {
+  var ss = advSheet_(true);
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'advisorTick') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('advisorTick').timeBased().everyMinutes(15).create();
+  Logger.log('Advisors sheet (your watchlist and journal): ' + ss.getUrl());
+  Logger.log(advCheckKeys_());
+  advRun_(new Date(), true);
+  Logger.log('First scan done. Open the terminal and look for the Advisors panel.');
+}
+
+// runs every 15 minutes
+function advisorTick() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return;
+  try { advRun_(new Date(), false); }
+  catch (e) { advSet_(PropertiesService.getScriptProperties(), 'ADV_TICK', { at: Date.now(), err: String(e &amp;&amp; e.message || e) }); }
+  finally { lock.releaseLock(); }
+}
+
+function advCheckKeys_() {
+  var out = [];
+  if (!TWELVE_KEY) out.push('Twelve Data: no key yet - paste it on the TWELVE_KEY line.');
+  else {
+    var r = UrlFetchApp.fetch('https://api.twelvedata.com/time_series?symbol=EUR/USD&amp;interval=1day&amp;outputsize=2&amp;apikey=' + TWELVE_KEY, { muteHttpExceptions: true });
+    var j = {}; try { j = JSON.parse(r.getContentText()); } catch (e) {}
+    out.push(j &amp;&amp; j.values ? 'Twelve Data: key works.' : 'Twelve Data: problem - ' + (j &amp;&amp; j.message || ('HTTP ' + r.getResponseCode())));
+  }
+  if (!GEMINI_KEY) out.push('Gemini: no key yet - paste it on the GEMINI_KEY line (advisors still work, with plain rule-based reasons).');
+  else {
+    var P = PropertiesService.getScriptProperties();
+    P.deleteProperty('ADV_MODELS');
+    var m = advModels_(P, new Date());
+    out.push(m.ok ? 'Gemini: key works. Judge ' + (m.judge || '-') + ', helper ' + (m.helper || '-') + ', backup ' + (m.backup || '-') + '.'
+      : 'Gemini: problem - ' + (m.err || 'no usable models found'));
+  }
+  return out.join('\n');
+}
+
+// ---------- storage ----------
+function advGet_(P, k, d) { var v = P.getProperty(k); if (!v) return d; try { return JSON.parse(v); } catch (e) { return d; } }
+function advSet_(P, k, v) { P.setProperty(k, JSON.stringify(v)); }
+function advId_(name, mode) { return (String(name) + '_' + mode).replace(/[^A-Za-z0-9_]/g, ''); }
+function advIsYahoo_(s) { return /[=^]/.test(s) || /\.[A-Z]{1,3}$/.test(s); }
+function advIST_(t, f) { return Utilities.formatDate(new Date(t), 'Asia/Kolkata', f || 'dd MMM HH:mm'); }
+
+function advSheet_(create) {
+  var P = PropertiesService.getScriptProperties(), id = P.getProperty('ADV_SHEET'), ss = null;
+  if (id) { try { ss = SpreadsheetApp.openById(id); } catch (e) { ss = null; } }
+  if (!ss &amp;&amp; create) {
+    ss = SpreadsheetApp.create('Day-Trade Terminal - Advisors');
+    var w = ss.getSheets()[0];
+    w.setName('Watchlist');
+    var head = ['On', 'Name', 'Mode (Day or Swing)', 'Data symbol', 'Backup symbol', 'News currencies'];
+    w.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold');
+    w.getRange(2, 1, ADV_DEFAULT_LIST.length, head.length).setValues(ADV_DEFAULT_LIST);
+    w.getRange(2, 1, ADV_DEFAULT_LIST.length + 30, 1).insertCheckboxes();
+    w.getRange(1, 4).setNote('Symbols with = or ^ (NQ=F, ^GDAXI) or an exchange ending (RELIANCE.NS) come from Yahoo: free but unofficial. ' +
+      'Others (XAU/USD, EUR/USD, QQQ) come from Twelve Data with your key.');
+    w.setFrozenRows(1);
+    var j = ss.insertSheet('Journal');
+    j.getRange(1, 1, 1, ADV_JOURNAL_HEAD.length).setValues([ADV_JOURNAL_HEAD]).setFontWeight('bold');
+    j.setFrozenRows(1);
+    P.setProperty('ADV_SHEET', ss.getId());
+  }
+  return ss;
+}
+
+function advWatchlist_() {
+  var ss = advSheet_(false);
+  if (!ss) return [];
+  var sh = ss.getSheetByName('Watchlist');
+  if (!sh) return [];
+  var v = sh.getDataRange().getValues(), out = [], seen = {};
+  for (var i = 1; i &lt; v.length; i++) {
+    var r = v[i], name = String(r[1] || '').trim(), sym = String(r[3] || '').trim();
+    if (r[0] !== true || !name || !sym) continue;
+    var mode = /swing/i.test(String(r[2])) ? 'swing' : 'day', id = advId_(name, mode);
+    if (seen[id]) continue;
+    seen[id] = 1;
+    var ccy = String(r[5] || '').toUpperCase().match(/[A-Z]{3}/g);
+    if (!ccy) ccy = name.toUpperCase().match(/[A-Z]{3}/g) || ['USD'];
+    out.push({ id: id, name: name, mode: mode, sym: sym, backup: String(r[4] || '').trim(), ccy: ccy });
+  }
+  return out;
+}
+
+function advJournal_(row) {
+  var ss = advSheet_(false);
+  if (!ss) return;
+  var sh = ss.getSheetByName('Journal') || ss.insertSheet('Journal');
+  sh.appendRow(row);
+}
+
+// ---------- price data ----------
+function advBars_(sym, mode, budget, force) {
+  var day = mode === 'day';
+  if (advIsYahoo_(sym)) {
+    var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) +
+      '?interval=' + (day ? '15m' : '1d') + '&amp;range=' + (day ? '5d' : '2y');
+    var r = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (r.getResponseCode() !== 200) return { err: 'Yahoo HTTP ' + r.getResponseCode() };
+    var j = null; try { j = JSON.parse(r.getContentText()); } catch (e) {}
+    var res = j &amp;&amp; j.chart &amp;&amp; j.chart.result &amp;&amp; j.chart.result[0];
+    if (!res || !res.timestamp || !res.indicators || !res.indicators.quote) return { err: 'Yahoo: no data' };
+    var q = res.indicators.quote[0], out = [];
+    for (var i = 0; i &lt; res.timestamp.length; i++) {
+      var o = q.open[i], h = q.high[i], l = q.low[i], c = q.close[i];
+      if (o == null || h == null || l == null || c == null) continue;
+      out.push({ t: res.timestamp[i] * 1000, o: o, h: h, l: l, c: c, v: (q.volume &amp;&amp; q.volume[i]) || 0 });
+    }
+    return out.length &gt; 30 ? { bars: out, src: 'Yahoo', sym: sym } : { err: 'Yahoo: too little data' };
+  }
+  if (!TWELVE_KEY) return { err: 'add your Twelve Data key' };
+  if (budget.left &lt; 1) return { err: 'later', later: true };
+  if (force &amp;&amp; budget.used &gt; 0 &amp;&amp; budget.used % ADV_CFG.creditsPerTick === 0) Utilities.sleep(61000);
+  budget.left--; budget.used++;
+  var url2 = 'https://api.twelvedata.com/time_series?symbol=' + encodeURIComponent(sym) + '&amp;interval=' + (day ? '15min' : '1day') +
+    '&amp;outputsize=' + (day ? 500 : 300) + '&amp;timezone=UTC&amp;apikey=' + TWELVE_KEY;
+  var r2 = UrlFetchApp.fetch(url2, { muteHttpExceptions: true });
+  var j2 = null; try { j2 = JSON.parse(r2.getContentText()); } catch (e) {}
+  if (!j2 || !j2.values) return { err: 'Twelve Data: ' + (j2 &amp;&amp; j2.message ? String(j2.message).slice(0, 120) : 'HTTP ' + r2.getResponseCode()) };
+  var bars = j2.values.map(function (x) {
+    var m = String(x.datetime).match(/(\d+)-(\d+)-(\d+)(?:[ T](\d+):(\d+))?/);
+    return { t: Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)), o: +x.open, h: +x.high, l: +x.low, c: +x.close, v: +(x.volume || 0) };
+  }).filter(function (b) { return isFinite(b.o) &amp;&amp; isFinite(b.c); }).sort(function (a, b) { return a.t - b.t; });
+  return bars.length &gt; 30 ? { bars: bars, src: 'Twelve Data', sym: sym } : { err: 'Twelve Data: too little data' };
+}
+
+function advLoad_(w, budget, force) {
+  var a = advBars_(w.sym, w.mode, budget, force);
+  if (a.bars || !w.backup) return a;
+  if (a.later) return a;
+  var b = advBars_(w.backup, w.mode, budget, force);
+  if (b.bars) { b.backupUsed = true; b.why = a.err; return b; }
+  return a.later ? a : (b.later ? b : { err: a.err + '; backup: ' + b.err });
+}
+
+// ---------- maths ----------
+function advEma_(a, n) { var k = 2 / (n + 1), o = [], e = a[0]; for (var i = 0; i &lt; a.length; i++) { e = i ? a[i] * k + e * (1 - k) : a[0]; o.push(e); } return o; }
+function advAtr_(b, n) {
+  var s = 0, c = 0;
+  for (var i = Math.max(1, b.length - n); i &lt; b.length; i++) {
+    s += Math.max(b[i].h - b[i].l, Math.abs(b[i].h - b[i - 1].c), Math.abs(b[i].l - b[i - 1].c)); c++;
+  }
+  return c ? s / c : 0;
+}
+function advRsi_(cl, n) {
+  if (cl.length &lt;= n) return 50;
+  var g = 0, l = 0, i;
+  for (i = 1; i &lt;= n; i++) { var d = cl[i] - cl[i - 1]; if (d &gt; 0) g += d; else l -= d; }
+  g /= n; l /= n;
+  for (i = n + 1; i &lt; cl.length; i++) { var d2 = cl[i] - cl[i - 1]; g = (g * (n - 1) + Math.max(d2, 0)) / n; l = (l * (n - 1) + Math.max(-d2, 0)) / n; }
+  return l === 0 ? 100 : 100 - 100 / (1 + g / l);
+}
+function advAgg_(b, ms, off) {
+  var o = [], cur = null;
+  b.forEach(function (x) {
+    var k = Math.floor((x.t - (off || 0)) / ms);
+    if (!cur || cur.k !== k) { cur = { k: k, t: k * ms + (off || 0), o: x.o, h: x.h, l: x.l, c: x.c, v: x.v }; o.push(cur); }
+    else { cur.h = Math.max(cur.h, x.h); cur.l = Math.min(cur.l, x.l); cur.c = x.c; cur.v += x.v; }
+  });
+  return o;
+}
+function advFractals_(b, k) {
+  var H = [], L = [];
+  for (var i = k; i &lt; b.length - k; i++) {
+    var hi = true, lo = true;
+    for (var j = 1; j &lt;= k; j++) {
+      if (!(b[i].h &gt; b[i - j].h &amp;&amp; b[i].h &gt;= b[i + j].h)) hi = false;
+      if (!(b[i].l &lt; b[i - j].l &amp;&amp; b[i].l &lt;= b[i + j].l)) lo = false;
+    }
+    if (hi) H.push({ i: i, p: b[i].h, t: b[i].t });
+    if (lo) L.push({ i: i, p: b[i].l, t: b[i].t });
+  }
+  return { H: H, L: L };
+}
+// trend by breaks of structure: 1 up, -1 down, 0 unclear
+function advTrend_(b) {
+  var f = advFractals_(b, 2), isH = {}, isL = {}, lastH = null, lastL = null, dir = 0, at = null;
+  f.H.forEach(function (x) { isH[x.i] = x.p; });
+  f.L.forEach(function (x) { isL[x.i] = x.p; });
+  for (var i = 0; i &lt; b.length; i++) {
+    if (isH[i - 2] != null) lastH = isH[i - 2];
+    if (isL[i - 2] != null) lastL = isL[i - 2];
+    if (lastH != null &amp;&amp; b[i].c &gt; lastH &amp;&amp; dir !== 1) { dir = 1; at = lastH; }
+    else if (lastL != null &amp;&amp; b[i].c &lt; lastL &amp;&amp; dir !== -1) { dir = -1; at = lastL; }
+  }
+  return { dir: dir, at: at };
+}
+function advDp_(p) { var a = Math.abs(p); return a &lt; 10 ? 5 : a &lt; 200 ? 3 : a &lt; 5000 ? 2 : 1; }
+function advFmt_(p, ref) { return p == null ? '-' : Number(p).toFixed(advDp_(ref == null ? p : ref)); }
+
+// ---------- the advisors ----------
+function advAnalyse_(w, bars, now, ctx) {
+  var day = w.mode === 'day', iv = day ? 15 * 60000 : 86400000;
+  var b = bars.slice();
+  while (b.length &amp;&amp; b[b.length - 1].t + iv &gt; now) b.pop();          // only finished candles
+  if (b.length &lt; 40) return { status: 'nodata', note: 'not enough finished candles yet' };
+  var last = b[b.length - 1], close = last.c, n = b.length;
+  var atr = advAtr_(b, 14) || Math.abs(close) * 0.001;
+  var htf = day ? advAgg_(b, 4 * 3600000) : advAgg_(b, 7 * 86400000, 4 * 86400000);
+  var htfName = day ? '4-hour' : 'weekly';
+  var bias = advTrend_(htf);
+  var levels = [], i;
+  if (day) {
+    var off = (24 - ADV_CFG.rollUTC) * 3600000, td = function (t) { return Math.floor((t + off) / 86400000); };
+    var today = td(now), prev = -1;
+    for (i = n - 1; i &gt;= 0; i--) { var d = td(b[i].t); if (d &lt; today) { prev = d; break; } }
+    var firstToday = n, ph = -Infinity, pl = Infinity, ah = -Infinity, al = Infinity, aEnd = -1;
+    for (i = 0; i &lt; n; i++) {
+      var di = td(b[i].t), hr = new Date(b[i].t).getUTCHours();
+      if (di === prev) { ph = Math.max(ph, b[i].h); pl = Math.min(pl, b[i].l); }
+      if (di === today) {
+        if (firstToday === n) firstToday = i;
+        if (hr &lt; 6) { ah = Math.max(ah, b[i].h); al = Math.min(al, b[i].l); aEnd = i; }
+      }
+    }
+    if (isFinite(ph)) { levels.push({ p: ph, side: 'high', name: "yesterday's high", major: true, from: firstToday }); levels.push({ p: pl, side: 'low', name: "yesterday's low", major: true, from: firstToday }); }
+    if (isFinite(ah) &amp;&amp; new Date(now).getUTCHours() &gt;= 6 &amp;&amp; aEnd &gt;= 0) { levels.push({ p: ah, side: 'high', name: 'the Asian high', major: true, from: aEnd + 1 }); levels.push({ p: al, side: 'low', name: 'the Asian low', major: true, from: aEnd + 1 }); }
+  } else {
+    var wk = advAgg_(b, 7 * 86400000, 4 * 86400000);
+    if (wk.length &gt;= 2) {
+      var pw = wk[wk.length - 2], fromW = n;
+      for (i = 0; i &lt; n; i++) if (b[i].t &gt;= wk[wk.length - 1].t) { fromW = i; break; }
+      levels.push({ p: pw.h, side: 'high', name: "last week's high", major: true, from: fromW });
+      levels.push({ p: pw.l, side: 'low', name: "last week's low", major: true, from: fromW });
+    }
+  }
+  var look = day ? 192 : 60, fr = advFractals_(b.slice(Math.max(0, n - look)), 2), base = Math.max(0, n - look);
+  fr.H.forEach(function (x) { if (base + x.i &lt; n - 3) levels.push({ p: x.p, side: 'high', name: 'a recent swing high', major: false, from: base + x.i + 3, i: base + x.i }); });
+  fr.L.forEach(function (x) { if (base + x.i &lt; n - 3) levels.push({ p: x.p, side: 'low', name: 'a recent swing low', major: false, from: base + x.i + 3, i: base + x.i }); });
+
+  var S = advStructure_(b, levels, day ? 16 : 5, atr, bias, htfName, fr, base);
+  var dir = S.dir || bias.dir;
+  var M = advMomentum_(b, htf, dir, day, now);
+  var R = S.trade ? advRisk_(w, S.trade, atr, day, now, ctx) : { s: 0, ok: false, t: 'Nothing to check until there is a setup.' };
+  return { status: 'ok', price: close, at: last.t, atr: atr, bias: bias.dir, htfName: htfName, S: S, M: M, R: R, dir: dir };
+}
+
+function advStructure_(b, levels, W, atr, bias, htfName, fr, base) {
+  var n = b.length, start = Math.max(3, n - W), best = null;
+  levels.forEach(function (lv) {
+    var long = lv.side === 'low';
+    for (var j = Math.max(start, lv.from); j &lt; n; j++) {
+      if (!(long ? b[j].l &lt; lv.p : b[j].h &gt; lv.p)) continue;
+      var q, broken = false;
+      for (q = lv.from; q &lt; j; q++) if (long ? b[q].c &lt; lv.p : b[q].c &gt; lv.p) { broken = true; break; }
+      if (broken) break;
+      var k = -1;
+      for (q = j; q &lt; Math.min(n, j + 3); q++) if (long ? b[q].c &gt; lv.p : b[q].c &lt; lv.p) { k = q; break; }
+      if (k &lt; 0) break;
+      var lost = false;
+      for (q = k + 1; q &lt; n; q++) if (long ? b[q].c &lt; lv.p : b[q].c &gt; lv.p) { lost = true; break; }
+      if (lost) break;
+      if (!best || j &gt; best.j || (j === best.j &amp;&amp; lv.major &amp;&amp; !best.lv.major)) best = { lv: lv, j: j, k: k, dir: long ? 1 : -1 };
+      break;
+    }
+  });
+  var trendWord = bias.dir &gt; 0 ? 'up' : bias.dir &lt; 0 ? 'down' : 'sideways';
+  var tf = htfName === '4-hour' ? '4H' : 'W';
+  if (!best) return { s: 0, dir: 0, stage: 'none', short: 'No setup · ' + tf + ' ' + (bias.dir &gt; 0 ? '↑' : bias.dir &lt; 0 ? '↓' : '↔'), t: 'No liquidity grab in the last ' + (W === 16 ? '4 hours' : W + ' days') + '. ' + cap_(htfName) + ' trend ' + trendWord + '.' };
+  var d = best.dir, j = best.j, last = b[n - 1], close = last.c, q;
+  var ext = d &gt; 0 ? Infinity : -Infinity;
+  for (q = j; q &lt; n; q++) ext = d &gt; 0 ? Math.min(ext, b[q].l) : Math.max(ext, b[q].h);
+  // the swing point that must break for a shift in structure
+  var ref = null, list = d &gt; 0 ? fr.H : fr.L;
+  for (q = list.length - 1; q &gt;= 0; q--) { var gi = base + list[q].i; if (gi &lt; j &amp;&amp; gi &gt;= j - 24) { ref = list[q].p; break; } }
+  if (ref == null) { ref = d &gt; 0 ? -Infinity : Infinity; for (q = Math.max(0, j - 6); q &lt; j; q++) ref = d &gt; 0 ? Math.max(ref, b[q].h) : Math.min(ref, b[q].l); }
+  var m = -1;
+  for (q = j; q &lt; n; q++) if (d &gt; 0 ? b[q].c &gt; ref : b[q].c &lt; ref) { m = q; break; }
+  var swept = 'Took ' + best.lv.name + ' (' + advFmt_(best.lv.p) + ')';
+  if (m &lt; 0) return { s: 0, dir: d, stage: 'swept', short: advShort_(best.lv.name) + ' swept · no MSS yet', t: swept + ', waiting for a break ' + (d &gt; 0 ? 'above ' : 'below ') + advFmt_(ref, close) + '.', key: best.lv.name + '@' + b[j].t };
+  var disp = d &gt; 0 ? b[m].c - b[m].o &gt;= 0.8 * atr : b[m].o - b[m].c &gt;= 0.8 * atr;
+  // fair value gap made by the move
+  var gap = null;
+  for (q = j + 2; q &lt; n; q++) {
+    var g = d &gt; 0 ? (b[q].l &gt; b[q - 2].h ? { top: b[q].l, bot: b[q - 2].h, i: q } : null) : (b[q].h &lt; b[q - 2].l ? { top: b[q - 2].l, bot: b[q].h, i: q } : null);
+    if (!g) continue;
+    var dead = false;
+    for (var z = q + 1; z &lt; n; z++) if (d &gt; 0 ? b[z].c &lt; g.bot : b[z].c &gt; g.top) { dead = true; break; }
+    if (!dead) gap = g;
+  }
+  var entry, how, zone;
+  if (gap) {
+    if (d &gt; 0) { if (close &gt; gap.top) { entry = gap.top; zone = 'wait'; } else { entry = close; zone = 'now'; } }
+    else { if (close &lt; gap.bot) { entry = gap.bot; zone = 'wait'; } else { entry = close; zone = 'now'; } }
+    how = 'the gap ' + advFmt_(gap.bot, close) + '-' + advFmt_(gap.top, close);
+  } else if (d &gt; 0 ? close &gt; ref : close &lt; ref) { entry = ref; zone = 'wait'; how = 'a retest of ' + advFmt_(ref, close); }
+  else { entry = close; zone = 'now'; how = 'the current price'; }
+  var stop = d &gt; 0 ? ext - 0.1 * atr : ext + 0.1 * atr;
+  if (d &gt; 0 ? entry &lt;= stop : entry &gt;= stop) return { s: 0, dir: d, stage: 'none', short: advShort_(best.lv.name) + ' swept · no clean entry', t: swept + ', but price is back at the lows - no clean entry.' };
+  var risk = Math.abs(entry - stop), tgt = null, tname = '', obst = 0;
+  var opp = levels.filter(function (lv) { return lv.side === (d &gt; 0 ? 'high' : 'low') &amp;&amp; (d &gt; 0 ? lv.p &gt; entry : lv.p &lt; entry); })
+    .sort(function (a, c) { return d &gt; 0 ? a.p - c.p : c.p - a.p; });
+  var major = opp.filter(function (lv) { return lv.major; });
+  if (major.length) { tgt = major[0].p; tname = major[0].name; obst = opp.filter(function (lv) { return !lv.major &amp;&amp; (d &gt; 0 ? lv.p &lt; tgt : lv.p &gt; tgt); }).length; }
+  else {
+    for (q = 0; q &lt; opp.length; q++) if (Math.abs(opp[q].p - entry) &gt;= ADV_CFG.minRR * risk) { tgt = opp[q].p; tname = opp[q].name; break; }
+    if (tgt == null) { tgt = entry + d * ADV_CFG.minRR * risk; tname = 'a 1:2 target (no clear level beyond)'; }
+  }
+  var aligned = bias.dir === d ? 1 : bias.dir === 0 ? 0 : -1;
+  var s = (aligned &gt; 0 ? 30 : aligned === 0 ? 12 : 0) + (best.lv.major ? 25 : 18) + 25 + (disp ? 5 : 0) + (gap ? 15 : 5);
+  if (obst &gt; 1) s -= 5;
+  var t = swept + ', then broke ' + (d &gt; 0 ? 'above ' : 'below ') + advFmt_(ref, close) + (disp ? ' with force' : '') + '. Entry at ' + how +
+    '. ' + cap_(htfName) + ' trend ' + trendWord + (aligned &gt; 0 ? ' - with the trade.' : aligned &lt; 0 ? ' - against the trade.' : '.');
+  return {
+    s: Math.max(0, Math.min(100, s)), dir: d, stage: 'setup', short: advShort_(best.lv.name) + ' swept · MSS ' + (d &gt; 0 ? '↑' : '↓'), t: t, key: best.lv.name + '@' + b[j].t,
+    trade: { dir: d, entry: entry, stop: stop, target: tgt, tname: tname, rr: Math.abs(tgt - entry) / risk, zone: zone, aligned: aligned, disp: disp, gap: !!gap }
+  };
+}
+
+function advMomentum_(b, htf, dir, day, now) {
+  var cl = b.map(function (x) { return x.c; }), n = cl.length, close = cl[n - 1];
+  var e20 = advEma_(cl, 20), e50 = advEma_(cl, 50), rsi = advRsi_(cl, 14);
+  var hc = htf.map(function (x) { return x.c; }), h20 = advEma_(hc, 20);
+  var tr = e20[n - 1] &gt; e50[n - 1] &amp;&amp; close &gt; e20[n - 1] ? 1 : e20[n - 1] &lt; e50[n - 1] &amp;&amp; close &lt; e20[n - 1] ? -1 : 0;
+  var hs = hc.length &gt; 3 ? (h20[h20.length - 1] &gt; h20[h20.length - 4] ? 1 : h20[h20.length - 1] &lt; h20[h20.length - 4] ? -1 : 0) : 0;
+  var vw = null;
+  if (day) {
+    var off = (24 - ADV_CFG.rollUTC) * 3600000, today = Math.floor((now + off) / 86400000), pv = 0, vv = 0;
+    b.forEach(function (x) { if (Math.floor((x.t + off) / 86400000) === today &amp;&amp; x.v &gt; 0) { pv += (x.h + x.l + x.c) / 3 * x.v; vv += x.v; } });
+    if (vv &gt; 0) vw = pv / vv;
+  }
+  var d = dir || tr || hs, s = 50, bits = [];
+  var word = function (x) { return x &gt; 0 ? 'up' : x &lt; 0 ? 'down' : 'flat'; };
+  bits.push((day ? '15-min' : 'Daily') + ' trend ' + word(tr));
+  bits.push((day ? '4-hour' : 'weekly') + ' average ' + (hs &gt; 0 ? 'rising' : hs &lt; 0 ? 'falling' : 'flat'));
+  bits.push('RSI ' + Math.round(rsi));
+  if (vw != null) bits.push((close &gt; vw ? 'above' : 'below') + " today's average price");
+  if (d) {
+    s += tr === d ? 15 : tr === -d ? -15 : 0;
+    s += hs === d ? 10 : hs === -d ? -10 : 0;
+    if (vw != null) s += (close - vw) * d &gt; 0 ? 10 : -10;
+    if (d &gt; 0 ? rsi &gt; 75 : rsi &lt; 25) { s -= 10; bits.push('stretched'); }
+    else if (d &gt; 0 ? rsi &gt;= 45 &amp;&amp; rsi &lt;= 70 : rsi &gt;= 30 &amp;&amp; rsi &lt;= 55) s += 5;
+  }
+  return { s: Math.max(0, Math.min(100, s)), dir: d, t: bits.join(', ') + '.' };
+}
+
+function advRisk_(w, tr, atr, day, now, ctx) {
+  var s = 85, ok = true, bits = [], vetoes = [];
+  var stopSize = Math.abs(tr.entry - tr.stop) / atr;
+  if (tr.rr &lt; ADV_CFG.minRR) { ok = false; vetoes.push('reward only 1:' + tr.rr.toFixed(1) + ' before ' + tr.tname); }
+  else { bits.push('1:' + tr.rr.toFixed(1)); if (tr.rr &gt;= 3) s += 10; }
+  if (stopSize &lt; 0.3) { s -= 25; bits.push('stop very tight for current swings'); }
+  else if (stopSize &gt; (day ? 3 : 4)) { s -= 20; bits.push('stop wide - size down'); }
+  else bits.push('stop ' + stopSize.toFixed(1) + 'x the usual candle range');
+  var ev = advNewsNear_(w.ccy, now, day ? -15 : 0, day ? 60 : 24 * 60, ctx.ff);
+  if (ev) {
+    var when = advIST_(Date.parse(ev.date), 'HH:mm') + ' IST';
+    if (day) { ok = false; vetoes.push('high-impact ' + ev.country + ' news (' + ev.title + ') at ' + when); }
+    else { s -= 10; bits.push('big ' + ev.country + ' news within a day (' + ev.title + ')'); }
+  } else bits.push(day ? 'no big news in the next hour' : 'no big news in the next day');
+  if (day) {
+    if (ctx.losses &gt;= 2) { ok = false; vetoes.push('two paper losses today - daily stop'); }
+    var hr = new Date(now).getUTCHours() + new Date(now).getUTCMinutes() / 60;
+    if (!((hr &gt;= 7 &amp;&amp; hr &lt; 10) || (hr &gt;= 12 &amp;&amp; hr &lt; 16))) { s -= 8; bits.push('outside the London/New York open hours'); }
+  }
+  return { s: ok ? Math.max(0, Math.min(100, s)) : 0, ok: ok, t: ok ? cap_(bits.join(', ')) + '.' : 'No: ' + vetoes.join('; ') + '.' };
+}
+
+function advNewsNear_(ccy, now, fromMin, toMin, ff) {
+  for (var i = 0; i &lt; (ff || []).length; i++) {
+    var e = ff[i];
+    if (!e || e.impact !== 'High' || ccy.indexOf(e.country) &lt; 0) continue;
+    var t = Date.parse(e.date);
+    if (t &gt;= now + fromMin * 60000 &amp;&amp; t &lt;= now + toMin * 60000) return e;
+  }
+  return null;
+}
+function advShort_(n) {
+  return { "yesterday's high": 'PDH', "yesterday's low": 'PDL', 'the Asian high': 'Asia H', 'the Asian low': 'Asia L',
+    "last week's high": 'PWH', "last week's low": 'PWL', 'a recent swing high': 'Swing H', 'a recent swing low': 'Swing L' }[n] || n;
+}
+function cap_(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+// ---------- Gemini ----------
+function advModels_(P, now) {
+  var m = advGet_(P, 'ADV_MODELS', null);
+  if (m &amp;&amp; m.ok &amp;&amp; now - m.at &lt; 24 * 3600000 &amp;&amp; m.plan === AI_PLAN) return m;
+  m = { at: +now, ok: false, plan: AI_PLAN, judge: '', helper: '', backup: '' };
+  if (!GEMINI_KEY) return m;
+  var names = [], token = '';
+  for (var pg = 0; pg &lt; 5; pg++) {
+    var r = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200' + (token ? '&amp;pageToken=' + encodeURIComponent(token) : ''),
+      { muteHttpExceptions: true, headers: { 'x-goog-api-key': GEMINI_KEY } });
+    if (r.getResponseCode() !== 200) { m.err = 'Gemini HTTP ' + r.getResponseCode(); break; }
+    var j = JSON.parse(r.getContentText());
+    (j.models || []).forEach(function (x) {
+      if ((x.supportedGenerationMethods || []).indexOf('generateContent') &gt;= 0) names.push(String(x.name).replace(/^models\//, ''));
+    });
+    token = j.nextPageToken;
+    if (!token) break;
+  }
+  var paid = AI_PLAN === 'paid';
+  var pick = function (re) {
+    var best = null;
+    names.forEach(function (nm) {
+      var x = re.exec(nm); if (!x) return;
+      var sc = parseFloat(x[1]) * 10 - (x[2] ? (paid ? 0.5 : 100) : 0);
+      if (!best || sc &gt; best.s) best = { n: nm, s: sc };
+    });
+    return best ? best.n : '';
+  };
+  m.judge = pick(/^gemini-(\d+(?:\.\d+)?)-flash(-preview[\w-]*)?$/);
+  m.helper = pick(/^gemini-(\d+(?:\.\d+)?)-flash-lite(-preview[\w-]*)?$/);
+  var gb = null;
+  names.forEach(function (nm) {
+    var x = /^gemma-(\d+)[a-z]?-e?(\d+)b-it$/.exec(nm); if (!x) return;
+    var sc = +x[1] * 1000 + +x[2];
+    if (!gb || sc &gt; gb.s) gb = { n: nm, s: sc };
+  });
+  m.backup = gb ? gb.n : '';
+  m.ok = !!(m.judge || m.helper || m.backup);
+  if (names.length) advSet_(P, 'ADV_MODELS', m);
+  return m;
+}
+
+function advGemini_(model, prompt, json) {
+  var body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 2048 } };
+  if (json) body.generationConfig.responseMimeType = 'application/json';
+  var r = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
+    method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true,
+    headers: { 'x-goog-api-key': GEMINI_KEY }
+  });
+  var code = r.getResponseCode();
+  if (code === 400 &amp;&amp; json) return advGemini_(model, prompt, false);
+  if (code !== 200) return { ok: false, code: code };
+  var j = null; try { j = JSON.parse(r.getContentText()); } catch (e) {}
+  var parts = j &amp;&amp; j.candidates &amp;&amp; j.candidates[0] &amp;&amp; j.candidates[0].content &amp;&amp; j.candidates[0].content.parts || [];
+  var text = parts.filter(function (p) { return !p.thought &amp;&amp; p.text; }).map(function (p) { return p.text; }).join('');
+  return text ? { ok: true, text: text } : { ok: false, code: 204 };
+}
+
+function advAsk_(tier, prompt, P, now) {
+  var m = advModels_(P, now);
+  if (!m.ok) return null;
+  var caps = ADV_CFG.caps[AI_PLAN === 'paid' ? 'paid' : 'free'];
+  var dkey = Utilities.formatDate(new Date(now), 'America/Los_Angeles', 'yyyy-MM-dd');
+  var use = advGet_(P, 'ADV_AIUSE', {});
+  if (use.d !== dkey) use = { d: dkey, judge: 0, helper: 0, backup: 0, fail: 0, cool: {}, n429: {} };
+  var order = tier === 'judge' ? ['judge', 'helper', 'backup'] : ['helper', 'backup'];
+  var out = null;
+  for (var i = 0; i &lt; order.length &amp;&amp; !out; i++) {
+    var t = order[i], name = m[t];
+    if (!name || use[t] &gt;= caps[t] || (use.cool[name] || 0) &gt; now) continue;
+    var res = advGemini_(name, prompt, t !== 'backup');
+    if (res.ok) {
+      var parsed = advParseAI_(res.text);
+      use[t]++;
+      if (parsed) out = { r: parsed, model: name };
+      continue;
+    }
+    use.fail++;
+    if (res.code === 429) {
+      use.n429[name] = (use.n429[name] || 0) + 1;
+      use.cool[name] = now + (use.n429[name] &gt;= 3 ? 24 * 3600000 : 20 * 60000);
+    } else if (res.code === 404) { use.cool[name] = now + 24 * 3600000; P.deleteProperty('ADV_MODELS'); }
+    else use.cool[name] = now + 10 * 60000;
+  }
+  advSet_(P, 'ADV_AIUSE', use);
+  return out;
+}
+
+function advParseAI_(text) {
+  var a = text.indexOf('{'), b = text.lastIndexOf('}');
+  if (a &lt; 0 || b &lt;= a) return null;
+  var j = null; try { j = JSON.parse(text.slice(a, b + 1)); } catch (e) { return null; }
+  var v = String(j.verdict || '').toUpperCase();
+  if (['TAKE', 'WATCH', 'WAIT', 'SKIP'].indexOf(v) &lt; 0) return null;
+  var c = Math.round(Number(j.confidence));
+  var str = function (x) { return String(x || '').replace(/\s+/g, ' ').trim().slice(0, 240); };
+  return { verdict: v, conf: isFinite(c) ? Math.max(0, Math.min(100, c)) : null, judge: str(j.judge), structure: str(j.structure), momentum: str(j.momentum), risk: str(j.risk) };
+}
+
+function advPrompt_(w, A, rule, score, now) {
+  var tr = A.S.trade, f = function (p) { return advFmt_(p, A.price); };
+  return [
+    'You are the judge on a four-advisor trading desk. The trader uses ICT / smart-money ideas: liquidity sweeps, shifts in market structure and fair value gaps.',
+    'Their rules: risk 0.5-1% a trade, at least 1:2 reward to risk, stop for the day after two losses, no entries just before high-impact news.',
+    'Market: ' + w.name + ' (' + (w.mode === 'day' ? 'day trade, 15-minute candles' : 'swing trade, daily candles') + '). Time: ' + advIST_(now, 'EEE HH:mm') + ' IST. Price ' + f(A.price) + '.',
+    'Proposed: ' + (tr.dir &gt; 0 ? 'BUY' : 'SELL') + ' at ' + f(tr.entry) + (tr.zone === 'now' ? ' (price is there now)' : ' (wait for price to come back)') +
+      ', stop ' + f(tr.stop) + ', target ' + f(tr.target) + ' (' + tr.tname + '), reward to risk 1:' + tr.rr.toFixed(1) + '.',
+    'Structure advisor (' + A.S.s + '/100): ' + A.S.t,
+    'Momentum advisor (' + A.M.s + '/100): ' + A.M.t,
+    'Risk advisor (' + A.R.s + '/100): ' + A.R.t,
+    'Desk rule-based verdict: ' + rule + ' (weighted score ' + score + ', bar ' + ADV_CFG.take + ').',
+    'Reply with JSON only: {"verdict":"TAKE or WATCH or WAIT","confidence":0-100,"judge":"","structure":"","momentum":"","risk":""}.',
+    'Each text is one short plain-English sentence (under 25 words) in that advisor\'s voice; judge gives the decision and the main reason.',
+    'Use only the prices given above. Do not invent levels or news.'
+  ].join('\n');
+}
+
+// ---------- one scan ----------
+var ADV_RANK = { SKIP: 0, WAIT: 1, WATCH: 2, TAKE: 3 };
+
+function advJudge_(w, A, P, now, ctx) {
+  var trust = ctx.trust[w.mode];
+  var out = {
+    id: w.id, name: w.name, mode: w.mode, status: 'ok', src: A.src, sym: A.sym, backupUsed: !!A.backupUsed, price: A.price, at: now, bar: A.at,
+    verdict: 'WAIT', dir: A.dir, conf: null, score: null, ai: '', aiConf: null, bias: A.bias, stage: A.S.stage, short: A.S.short,
+    adv: { structure: { s: A.S.s, t: A.S.t }, momentum: { s: A.M.s, t: A.M.t }, risk: { s: A.R.s, t: A.R.t }, judge: { t: '' } }
+  };
+  if (!A.S.trade) {
+    out.adv.judge.t = A.S.stage === 'swept' ? 'Setup forming - waiting for the break before it counts.' : 'No setup. Nothing to do.';
+    return out;
+  }
+  var tr = A.S.trade;
+  out.entry = tr.entry; out.stop = tr.stop; out.target = tr.target; out.rr = tr.rr; out.zone = tr.zone; out.tname = tr.tname; out.dir = tr.dir;
+  var ws = trust.structure, wm = trust.momentum, wr = trust.risk;
+  var score = Math.round((ws * A.S.s + wm * A.M.s + wr * A.R.s) / (ws + wm + wr));
+  out.score = score;
+  var rule = !A.R.ok ? 'SKIP' : score &gt;= ADV_CFG.take ? 'TAKE' : score &gt;= ADV_CFG.watch ? 'WATCH' : 'WAIT';
+  out.verdict = rule; out.conf = score;
+  out.adv.judge.t = rule === 'SKIP' ? 'Skip - the risk check failed.' : 'Score ' + score + ' against a bar of ' + ADV_CFG.take + '.';
+  out.key = w.id + '|' + tr.dir + '|' + A.S.key;
+  if (rule === 'TAKE' || rule === 'WATCH') {
+    var cache = advGet_(P, 'ADV_AI_' + w.id, null), ai = null, model = '';
+    if (cache &amp;&amp; cache.key === out.key &amp;&amp; cache.rule === rule &amp;&amp; now - cache.at &lt; 3 * 3600000) { ai = cache.r; model = cache.model; }
+    else {
+      var got = advAsk_(rule === 'TAKE' ? 'judge' : 'helper', advPrompt_(w, A, rule, score, now), P, now);
+      if (got) { ai = got.r; model = got.model; advSet_(P, 'ADV_AI_' + w.id, { key: out.key, rule: rule, at: now, r: ai, model: model }); }
+    }
+    if (ai) {
+      out.ai = model;
+      ['structure', 'momentum', 'risk', 'judge'].forEach(function (k) { if (ai[k]) out.adv[k].ai = ai[k]; });
+      out.aiVerdict = ai.verdict;
+      if (ADV_RANK[ai.verdict] &lt; ADV_RANK[rule]) out.verdict = ai.verdict;
+      if (ai.conf != null) { out.aiConf = ai.conf; out.conf = Math.round((score + ai.conf) / 2); }
+    }
+  }
+  return out;
+}
+
+// ---------- paper trades ----------
+function advOpenTrade_(res, A, w, ctx, now) {
+  if (res.verdict !== 'TAKE' &amp;&amp; res.verdict !== 'WATCH') return;
+  var tr = A.S.trade, have = null;
+  ctx.trades.forEach(function (x) { if (x.wid === w.id) have = x; });
+  if (have) { if (have.key === res.key &amp;&amp; res.verdict === 'TAKE' &amp;&amp; have.call !== 'TAKE') have.call = 'TAKE'; return; }
+  if (ctx.keys.indexOf(res.key) &gt;= 0) return;
+  var iv = w.mode === 'day' ? 15 * 60000 : 86400000;
+  var dayEnd = null;
+  if (w.mode === 'day') { var e = new Date(now); e.setUTCHours(ADV_CFG.dayToUTC, 0, 0, 0); if (+e &lt;= now) e = new Date(+e + 86400000); dayEnd = +e; }
+  var hr = new Date(now).getUTCHours();
+  ctx.trades.push({
+    wid: w.id, name: w.name, mode: w.mode, call: res.verdict, key: res.key, dir: tr.dir, entry: tr.entry, stop: tr.stop, target: tr.target, rr: tr.rr,
+    status: tr.zone === 'now' ? 'open' : 'pending', created: now, filled: tr.zone === 'now' ? now : null, from: A.at + (w.mode === 'day' ? 2 : 1) * iv,
+    expire: now + ADV_CFG.pendingHours[w.mode] * 3600000, dayEnd: dayEnd, holdUntil: w.mode === 'swing' ? now + ADV_CFG.holdHours.swing * 3600000 : null,
+    sc: { structure: A.S.s, momentum: A.M.s, risk: A.R.s, judge: res.conf },
+    session: w.mode === 'day' ? ((hr &gt;= 7 &amp;&amp; hr &lt; 10) ? 'London open' : (hr &gt;= 12 &amp;&amp; hr &lt; 16) ? 'New York open' : 'other') : '',
+    aligned: tr.aligned &gt; 0 ? 'yes' : tr.aligned &lt; 0 ? 'no' : 'unclear', data: A.sym, why: (res.adv.judge.ai || res.adv.judge.t)
+  });
+  ctx.keys.push(res.key);
+  if (ctx.keys.length &gt; 80) ctx.keys = ctx.keys.slice(-80);
+}
+
+// returns closed trades
+function advResolve_(ctx, wid, bars, now) {
+  var closed = [];
+  ctx.trades = ctx.trades.filter(function (tr) {
+    if (tr.wid !== wid) return true;
+    var d = tr.dir, risk = Math.abs(tr.entry - tr.stop), lastBar = null, done = null;
+    for (var i = 0; i &lt; bars.length &amp;&amp; !done; i++) {
+      var b = bars[i];
+      if (b.t &lt; tr.from) continue;
+      if (tr.dayEnd &amp;&amp; b.t &gt;= tr.dayEnd) break;
+      lastBar = b;
+      if (tr.status === 'pending') {
+        if (b.t &gt; tr.expire) { done = { res: 'expired', r: 0, why: 'price never came back to the entry' }; break; }
+        if (d &gt; 0 ? b.l &lt;= tr.entry : b.h &gt;= tr.entry) {
+          tr.status = 'open'; tr.filled = b.t;
+          if (d &gt; 0 ? b.l &lt;= tr.stop : b.h &gt;= tr.stop) done = { res: 'loss', r: -1 };
+          continue;
+        }
+        if (d &gt; 0 ? b.h &gt;= tr.target : b.l &lt;= tr.target) { done = { res: 'expired', r: 0, why: 'ran to the target without filling' }; break; }
+        continue;
+      }
+      if (d &gt; 0 ? b.l &lt;= tr.stop : b.h &gt;= tr.stop) done = { res: 'loss', r: -1 };
+      else if (d &gt; 0 ? b.h &gt;= tr.target : b.l &lt;= tr.target) done = { res: 'win', r: Math.round(tr.rr * 100) / 100 };
+      else if (tr.holdUntil &amp;&amp; b.t &gt; tr.holdUntil) done = { res: 'timed out', r: Math.round((b.c - tr.entry) * d / risk * 100) / 100 };
+    }
+    if (!done &amp;&amp; tr.dayEnd &amp;&amp; now &gt;= tr.dayEnd) {
+      if (tr.status === 'pending') done = { res: 'expired', r: 0, why: 'not filled before the session ended' };
+      else { var px = lastBar ? lastBar.c : tr.entry; done = { res: 'closed at session end', r: Math.round((px - tr.entry) * d / risk * 100) / 100 }; }
+    }
+    if (!done &amp;&amp; tr.status === 'pending' &amp;&amp; now &gt; tr.expire) done = { res: 'expired', r: 0, why: 'price never came back to the entry' };
+    if (!done) return true;
+    tr.result = done.res; tr.r = done.r; tr.closed = now; tr.whyClosed = done.why || '';
+    closed.push(tr);
+    return false;
+  });
+  return closed;
+}
+
+function advGrade_(ctx, tr, P) {
+  var mode = tr.mode, st = ctx.stats[mode] || (ctx.stats[mode] = { take: { n: 0, w: 0, l: 0, r: 0 }, all: { n: 0, w: 0, l: 0, r: 0 }, x: 0 });
+  if (tr.result === 'expired') { st.x++; }
+  else {
+    [st.all].concat(tr.call === 'TAKE' ? [st.take] : []).forEach(function (s) {
+      s.n++; s.r = Math.round((s.r + tr.r) * 100) / 100;
+      if (tr.r &gt; 0) s.w++; else if (tr.r &lt; 0) s.l++;
+    });
+    var good = tr.r &gt; 0, bad = tr.r &lt; 0, T = ctx.trust[mode];
+    if (good || bad) ['structure', 'momentum', 'risk'].forEach(function (k) {
+      var s = tr.sc[k], ch = 0;
+      if (s &gt;= 60) ch = good ? 3 : -3; else if (s &lt; 45) ch = good ? -2 : 2;
+      T[k] = Math.max(10, Math.min(90, T[k] + ch));
+    });
+    if (mode === 'day' &amp;&amp; tr.call === 'TAKE' &amp;&amp; bad) {
+      var dkey = advIST_(tr.closed, 'yyyy-MM-dd');
+      var L = advGet_(P, 'ADV_LOSS', {});
+      if (L.d !== dkey) L = { d: dkey, n: 0 };
+      L.n++; advSet_(P, 'ADV_LOSS', L);
+    }
+  }
+  ctx.recent.unshift({ name: tr.name, mode: mode, call: tr.call, dir: tr.dir, res: tr.result, r: tr.r, at: tr.closed });
+  ctx.recent = ctx.recent.slice(0, 10);
+  var f = function (p) { return Number(advFmt_(p, tr.entry)); };
+  advJournal_([advIST_(tr.closed), tr.name, mode, tr.call, tr.dir &gt; 0 ? 'Buy' : 'Sell', f(tr.entry), f(tr.stop), f(tr.target), Math.round(tr.rr * 10) / 10,
+    tr.result, tr.r, advIST_(tr.created), tr.filled ? advIST_(tr.filled) : '', tr.sc.structure, tr.sc.momentum, tr.sc.risk, tr.sc.judge,
+    tr.session, tr.aligned, tr.data, tr.whyClosed ? tr.why + ' | ' + tr.whyClosed : tr.why]);
+}
+
+// ---------- the 15-minute run ----------
+function advRun_(now, force) {
+  var t0 = Date.now();
+  now = +now;
+  var P = PropertiesService.getScriptProperties();
+  var wl = advWatchlist_();
+  var d = new Date(now), h = d.getUTCHours(), dow = d.getUTCDay();
+  var dayOn = dow &gt;= 1 &amp;&amp; dow &lt;= 5 &amp;&amp; h &gt;= ADV_CFG.dayFromUTC &amp;&amp; h &lt; ADV_CFG.dayToUTC;
+  var swingHour = h &lt; ADV_CFG.dayFromUTC &amp;&amp; dow &gt;= 2 &amp;&amp; dow &lt;= 6;
+  var budget = { left: force ? 28 : ADV_CFG.creditsPerTick, used: 0 };
+  var scan = advGet_(P, 'ADV_SCAN', {});
+  var L = advGet_(P, 'ADV_LOSS', {});
+  var ctx = {
+    trades: advGet_(P, 'ADV_TRADES', []), keys: advGet_(P, 'ADV_KEYS', []), recent: advGet_(P, 'ADV_RECENT', []),
+    stats: advGet_(P, 'ADV_STATS', {}),
+    trust: advGet_(P, 'ADV_TRUST', { day: { structure: 50, momentum: 50, risk: 50 }, swing: { structure: 50, momentum: 50, risk: 50 } }),
+    losses: L.d === advIST_(now, 'yyyy-MM-dd') ? L.n : 0, ff: []
+  };
+  try { ctx.ff = JSON.parse(getFF_()); } catch (e) { ctx.ff = []; }
+  var hasTrade = function (w) { return ctx.trades.some(function (x) { return x.wid === w.id; }); };
+  var todo = [];
+  wl.forEach(function (w) {
+    var last = scan[w.id] || 0, job = '';
+    if (w.mode === 'day') job = (force || dayOn) ? 'scan' : hasTrade(w) ? 'resolve' : '';
+    else job = (force || !last || (swingHour &amp;&amp; now - last &gt; 20 * 3600000)) ? 'scan' : '';
+    if (job) todo.push({ w: w, job: job, last: last });
+  });
+  todo.sort(function (a, b) { return (a.w.mode === b.w.mode ? 0 : a.w.mode === 'day' ? -1 : 1) || a.last - b.last; });
+  var done = 0, waiting = 0, errs = [];
+  for (var i = 0; i &lt; todo.length; i++) {
+    if (Date.now() - t0 &gt; 270000) { waiting += todo.length - i; break; }
+    var w = todo[i].w, got = advLoad_(w, budget, force);
+    if (got.later) { waiting++; continue; }
+    var prevRes = advGet_(P, 'ADV_R_' + w.id, null);
+    if (!got.bars) {
+      errs.push(w.name + ': ' + got.err);
+      advSet_(P, 'ADV_R_' + w.id, { id: w.id, name: w.name, mode: w.mode, status: 'nodata', note: got.err, at: now, last: prevRes &amp;&amp; prevRes.status === 'ok' ? prevRes : (prevRes &amp;&amp; prevRes.last) || null });
+      continue;
+    }
+    advResolve_(ctx, w.id, got.bars, now).forEach(function (tr) { advGrade_(ctx, tr, P); });
+    if (todo[i].job === 'scan') {
+      var A = advAnalyse_(w, got.bars, now, ctx);
+      if (A.status !== 'ok') { advSet_(P, 'ADV_R_' + w.id, { id: w.id, name: w.name, mode: w.mode, status: 'nodata', note: A.note, at: now }); continue; }
+      A.src = got.src; A.sym = got.sym; A.backupUsed = got.backupUsed;
+      var res = advJudge_(w, A, P, now, ctx);
+      advOpenTrade_(res, A, w, ctx, now);
+      advSet_(P, 'ADV_R_' + w.id, res);
+      scan[w.id] = now;
+    }
+    done++;
+  }
+  // forget results for markets taken off the watchlist
+  var ids = {}; wl.forEach(function (w) { ids[w.id] = 1; });
+  if (wl.length) Object.keys(P.getProperties()).forEach(function (k) { if (/^ADV_(R|AI)_/.test(k) &amp;&amp; !ids[k.replace(/^ADV_(R|AI)_/, '')]) P.deleteProperty(k); });
+  advSet_(P, 'ADV_SCAN', scan);
+  advSet_(P, 'ADV_TRADES', ctx.trades);
+  advSet_(P, 'ADV_KEYS', ctx.keys);
+  advSet_(P, 'ADV_RECENT', ctx.recent);
+  advSet_(P, 'ADV_STATS', ctx.stats);
+  advSet_(P, 'ADV_TRUST', ctx.trust);
+  advSet_(P, 'ADV_TICK', { at: now, done: done, waiting: waiting, credits: budget.used, errs: errs.slice(0, 5), secs: Math.round((Date.now() - t0) / 1000) });
+  return { done: done, waiting: waiting, credits: budget.used, errs: errs };
+}
+
+// ---------- what the terminal reads (?adv=1) ----------
+function advJson_() {
+  var P = PropertiesService.getScriptProperties(), all = P.getProperties(), rows = [];
+  Object.keys(all).forEach(function (k) { if (/^ADV_R_/.test(k)) { try { rows.push(JSON.parse(all[k])); } catch (e) {} } });
+  var g = function (k, d) { try { return all[k] ? JSON.parse(all[k]) : d; } catch (e) { return d; } };
+  var models = g('ADV_MODELS', {}), use = g('ADV_AIUSE', {});
+  var sheetId = all.ADV_SHEET;
+  return JSON.stringify({
+    v: 3, on: !!sheetId, at: Date.now(), plan: AI_PLAN, keys: { twelve: !!TWELVE_KEY, gemini: !!GEMINI_KEY },
+    models: { judge: models.judge || '', helper: models.helper || '', backup: models.backup || '' },
+    aiUse: { judge: use.judge || 0, helper: use.helper || 0, backup: use.backup || 0, day: use.d || '' },
+    caps: ADV_CFG.caps[AI_PLAN === 'paid' ? 'paid' : 'free'], bars: { take: ADV_CFG.take, watch: ADV_CFG.watch },
+    sheet: sheetId ? 'https://docs.google.com/spreadsheets/d/' + sheetId + '/edit' : '',
+    tick: g('ADV_TICK', null), rows: rows, trust: g('ADV_TRUST', null), stats: g('ADV_STATS', {}),
+    active: g('ADV_TRADES', []).map(function (t) { return { name: t.name, mode: t.mode, call: t.call, dir: t.dir, entry: t.entry, stop: t.stop, target: t.target, rr: t.rr, status: t.status, created: t.created }; }),
+    recent: g('ADV_RECENT', [])
+  });
 }
 </pre>
             <div class="kbtns"><button type="button" id="gasCopy">Copy code</button></div>
@@ -2371,6 +3184,7 @@ function text_(html) {
       const src = await loadFF(true);
       if (src === "relay") say(relayVer === 2 ? "Working — forecasts and official actual numbers load by themselves." : "Working, but it's the old relay code — update it (below) to get official actual numbers.", relayVer === 2);
       else say("Your relay didn't answer. Check the deployment is set to 'Anyone' and that you copied the /exec link.", false);
+      advLoad();
     });
     document.getElementById("ffRelayClear").addEventListener("click", () => {
       try { localStorage.removeItem("dtt.ffRelay"); } catch (e) {}
@@ -2417,7 +3231,133 @@ function text_(html) {
     }
   });
 
+  // ---------- Advisors (paper only) ----------
+  const ADV = { tab: store.get("advTab", "day"), data: store.get("advData", null), open: new Set(), busy: false, err: "", last: 0 };
+  const advDp = p => { const a = Math.abs(p); return a < 10 ? 5 : a < 200 ? 3 : a < 5000 ? 2 : 1; };
+  const advP = (p, ref) => p == null || !isFinite(p) ? "—" : Number(p).toLocaleString("en-US", { minimumFractionDigits: advDp(ref == null ? p : ref), maximumFractionDigits: advDp(ref == null ? p : ref) });
+  const ADV_ORDER = { TAKE: 0, WATCH: 1, SKIP: 2, WAIT: 3 };
+  const ADV_NAMES = { structure: "Structure", momentum: "Momentum", risk: "Risk", judge: "Judge" };
+  const advR = r => (r >= 0 ? "+" : "") + Number(r).toFixed(2) + "R";
+  function advStale(r) { return Date.now() - (r.at || 0) > (r.mode === "day" ? 40 * 60000 : 50 * 3600000); }
+  function advChip(r) {
+    if (r.status !== "ok") return '<span class="av">NO DATA</span>';
+    const v = r.verdict || "WAIT", arrow = (v === "TAKE" || v === "WATCH") ? (r.dir > 0 ? " ▲" : " ▼") : "";
+    return '<span class="av ' + v.toLowerCase() + '">' + v + arrow + "</span>";
+  }
+  function advLine(r) {
+    if (r.status !== "ok") return esc(r.note || "no data");
+    if (r.verdict === "SKIP") return esc(((r.adv.risk && r.adv.risk.t) || "").replace(/^No: /, ""));
+    if (r.entry != null && r.verdict !== "WAIT") return (r.dir > 0 ? "Buy " : "Sell ") + "<b>" + advP(r.entry, r.price) + "</b> · 1:" + Number(r.rr || 0).toFixed(1);
+    if (r.short) return esc(r.short);
+    const t = (r.adv && r.adv.structure && r.adv.structure.t) || "";
+    return esc(t.split(/\. /)[0]);
+  }
+  function advDetail(r, trust) {
+    if (r.status !== "ok") {
+      const L = r.last;
+      return '<div class="aline"><span class="k">Data</span><span class="t">' + esc(r.note || "no data") +
+        (L ? "<i>Last good read " + ffClock(L.at) + " IST: " + esc(L.verdict || "") + "</i>" : "") + "</span></div>";
+    }
+    let h = "";
+    if (r.entry != null) {
+      h += '<div class="alv"><span>Entry</span><span>Stop</span><span>Target</span><span>Reward</span><b>' + advP(r.entry, r.price) + "</b><b>" + advP(r.stop, r.price) +
+        "</b><b>" + advP(r.target, r.price) + "</b><b>1:" + Number(r.rr || 0).toFixed(1) + "</b></div>" +
+        '<div class="az">' + (r.zone === "now" ? "Price is at the entry now" : "Wait for price to come back to the entry") + (r.tname ? " · target: " + esc(r.tname) : "") + "</div>";
+    }
+    ["structure", "momentum", "risk", "judge"].forEach(k => {
+      const a = (r.adv && r.adv[k]) || {}, tw = trust && trust[k];
+      if (!a.t && !a.ai) return;
+      const sub = k === "judge" ? (r.score != null ? "score " + r.score : "") + (r.aiConf != null ? " · Gemini " + r.aiConf + "% sure" : "") : (a.s != null ? a.s + "/100" : "") + (tw != null ? " · trust " + tw : "");
+      h += '<div class="aline"><span class="k">' + ADV_NAMES[k] + "<small>" + sub + '</small></span><span class="t">' + esc(a.ai || a.t) + (a.ai ? "<i>" + esc(a.t) + "</i>" : "") + "</span></div>";
+    });
+    h += '<div class="asrc">Price ' + advP(r.price) + " · " + esc(r.sym || "") + " from " + esc(r.src || "") + (r.backupUsed ? " (backup)" : "") +
+      " · checked " + ffClock(r.at) + " IST" + (r.ai ? " · reasons by " + esc(r.ai) : "") + "</div>";
+    return h;
+  }
+  function advPaper(d) {
+    const st = d.stats || {}, T = d.trust || {};
+    const part = (x, lbl) => !x || !x.n ? lbl + " 0" : lbl + " " + x.n + " · " + Math.round(x.w / x.n * 100) + "% won · " + advR(x.r / x.n) + " avg";
+    let h = "";
+    [["day", "Day"], ["swing", "Swing"]].forEach(([m, lbl]) => {
+      const s = st[m];
+      h += '<div class="pst"><b>' + lbl + "</b>" + (s && (s.all.n || s.x) ? part(s.take, "TAKE calls") + " &nbsp;|&nbsp; " + part(s.all, "all") + (s.x ? " · " + s.x + " not filled" : "") : "no graded calls yet") +
+        (T[m] ? "<br>Trust: structure " + T[m].structure + " · momentum " + T[m].momentum + " · risk " + T[m].risk : "") + "</div>";
+    });
+    const act = d.active || [], rec = d.recent || [];
+    h += '<div class="phd">Open paper trades</div>' + (act.length ? act.map(t =>
+      '<div class="ptr"><b>' + esc(t.name) + '</b><span>' + esc(t.call) + " · " + (t.dir > 0 ? "Buy " : "Sell ") + advP(t.entry) + " → " + advP(t.target, t.entry) + ", stop " + advP(t.stop, t.entry) +
+      "</span><span>" + (t.status === "open" ? "in trade" : "waiting") + "</span></div>").join("") : '<div class="relempty">None right now.</div>');
+    h += '<div class="phd">Last results</div>' + (rec.length ? rec.map(t =>
+      '<div class="ptr"><b>' + esc(t.name) + "</b><span>" + esc(t.call) + " · " + (t.dir > 0 ? "Buy" : "Sell") + " · " + esc(t.res) + " · " + ffClock(t.at) + '</span><span class="' + (t.r > 0 ? "up" : t.r < 0 ? "dn" : "") + '">' + (t.res === "expired" ? "—" : advR(t.r)) + "</span></div>").join("") : '<div class="relempty">Nothing graded yet. Calls are graded automatically when they hit the stop or target.</div>');
+    return h;
+  }
+  function advRender() {
+    const box = document.getElementById("advRows"), stat = document.getElementById("advStat"), foot = document.getElementById("advFoot");
+    const d = ADV.data;
+    if (!getRelay()) { stat.innerHTML = ""; foot.innerHTML = ""; box.innerHTML = '<div class="relempty">Connect your relay first.' + SETLINK("ffKeys", "Settings ↓") + "</div>"; return; }
+    if (!d) {
+      stat.innerHTML = ""; foot.innerHTML = "";
+      box.innerHTML = '<div class="relempty">' + (ADV.err === "old" ? "Your relay is version 2. Update it to version 3 to switch on the advisors." + SETLINK("ffKeys", "how ↓")
+        : ADV.err ? "Relay is slow to answer — retrying…" : "Loading…") + "</div>";
+      return;
+    }
+    if (!d.on) {
+      stat.innerHTML = "";
+      box.innerHTML = '<div class="relempty">Relay is on version 3. Last step: run <b>setupAdvisors</b> once in your Apps Script project.' + SETLINK("ffKeys", "steps ↓") + "</div>";
+      foot.innerHTML = ""; return;
+    }
+    const tk = d.tick || {}, m = d.models || {}, u = d.aiUse || {}, cap = d.caps || {};
+    const ai = !d.keys.gemini ? "AI off — add a Gemini key" : (m.judge || m.helper || m.backup) ? "AI: " + esc(m.helper || m.judge || m.backup) + " (" + esc(d.plan) + " · " + (u.judge + u.helper + u.backup) + " used today)" : "AI: checking Gemini…";
+    stat.innerHTML = "Checked " + (tk.at ? ffClock(tk.at) + " IST" : "—") + " · " + ai + (d.keys.twelve ? "" : " · <b>add your Twelve Data key</b>") +
+      (tk.err ? " · <b>last run failed:</b> " + esc(tk.err) : tk.errs && tk.errs.length ? " · " + esc(tk.errs[0]) : "") + (ADV.err ? " · offline, showing last copy" : "");
+    if (ADV.tab === "paper") box.innerHTML = advPaper(d);
+    else {
+      const rows = (d.rows || []).filter(r => r.mode === ADV.tab).sort((a, b) =>
+        ((a.status === "ok" ? ADV_ORDER[a.verdict] : 9) - (b.status === "ok" ? ADV_ORDER[b.verdict] : 9)) || ((b.conf || 0) - (a.conf || 0)) || String(a.name).localeCompare(b.name));
+      const trust = d.trust && d.trust[ADV.tab];
+      box.innerHTML = rows.length ? rows.map(r => {
+        const st = advStale(r), id = r.id;
+        return '<div class="arow' + (ADV.open.has(id) ? " open" : "") + (st ? " stale" : "") + '"><button type="button" data-aid="' + esc(id) + '"><span class="an">' + esc(r.name) + "</span>" + advChip(r) +
+          '<span class="al">' + advLine(r) + '</span><span class="ac">' + (r.status === "ok" && r.score != null && (r.verdict === "TAKE" || r.verdict === "WATCH") && !st ? r.score : st ? ffClock(r.at) : "") + "</span></button>" +
+          '<div class="adet">' + advDetail(r, trust) + "</div></div>";
+      }).join("") : '<div class="relempty">' + (ADV.tab === "day" ? "No day-trade markets yet — they appear after the first scan." : "Swing markets are checked once a day after the New York close; the first check runs at setup.") + "</div>";
+    }
+    foot.innerHTML = (d.sheet ? '<a href="' + esc(d.sheet) + '" target="_blank" rel="noopener">Watchlist &amp; journal sheet ↗</a>' : "") +
+      "<span>Day markets every 15 min (11:30–02:30 IST, Mon–Fri) · bar to TAKE " + ((d.bars && d.bars.take) || 70) + "</span>";
+  }
+  async function advLoad() {
+    const relay = getRelay();
+    if (!relay) { advRender(); return; }
+    if (ADV.busy) return;
+    ADV.busy = true; ADV.last = Date.now();
+    const url = relay + (relay.indexOf("?") >= 0 ? "&" : "?") + "adv=1";
+    let got = null;
+    try { got = await ffGet(url); } catch (e) { got = null; }
+    if (!got || got.v !== 3) { try { const j = await ffJsonp(url); if (j) got = j; } catch (e) {} }
+    ADV.busy = false;
+    if (got && got.v === 3) { ADV.data = got; ADV.err = ""; store.set("advData", got); }
+    else ADV.err = got ? "old" : "fail";
+    if (ADV.err === "old") { ADV.data = null; store.set("advData", null); }
+    advRender();
+    clearTimeout(ADV.t);
+    ADV.t = setTimeout(advLoad, ADV.err === "fail" ? 90000 : 5 * 60000);
+  }
+  function initAdv() {
+    tabs("advTabs", [["day", "DAY"], ["swing", "SWING"], ["paper", "PAPER"]], ADV.tab, v => { ADV.tab = v; store.set("advTab", v); advRender(); });
+    document.getElementById("advRows").addEventListener("click", e => {
+      const b = e.target.closest("button[data-aid]");
+      if (!b) return;
+      const id = b.dataset.aid;
+      ADV.open.has(id) ? ADV.open.delete(id) : ADV.open.add(id);
+      b.parentElement.classList.toggle("open", ADV.open.has(id));
+    });
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - ADV.last > 120000) advLoad(); });
+    advRender();
+    advLoad();
+  }
+
   renderEvents(); updateEvents(); initFF(); loadFF();
+  initAdv();
   calc(); renderLoss(); tick();
   setInterval(tick, 1000);
   setInterval(updateEvents, 15000);
